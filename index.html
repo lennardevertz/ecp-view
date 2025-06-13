@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECP Comment Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="https://docs.ethcomments.xyz/logo-ecp-light.svg" type="image/svg+xml">
+</head>
+<body>
+    <header>
+        <img src="https://docs.ethcomments.xyz/logo-ecp-light.svg" alt="ECP Logo" id="logo">
+        <h1>Ethereum Comments Protocol Viewer</h1>
+    </header>
+    <main>
+        <div class="controls">
+            <button id="refresh-button">Refresh Comments</button>
+        </div>
+        <div id="comments-container">
+            <p class="loading-message">Loading comments...</p>
+        </div>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>
