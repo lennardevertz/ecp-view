@@ -85,24 +85,32 @@ main {
     margin-bottom: 8px;
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start; /* MODIFIED */
+    justify-content: space-between; /* ADDED */
 }
 
 .comment-header strong {
     color: #2c3e50;
 }
 
-.comment-header .author,
-.comment-header .app,
-.comment-header .date,
-.comment-header .channel,
-.comment-header .parent-info {
+.comment-header-info-left {
+    display: flex;
+    flex-wrap: wrap; /* Allow items to wrap within the left block */
+    align-items: center; /* Align items like author, app, channel vertically */
+}
+
+.comment-header-info-left .author,
+.comment-header-info-left .app {
     margin-right: 12px;
     white-space: nowrap;
+    margin-bottom: 4px; /* Add a small bottom margin for when items wrap */
 }
-.comment-header .parent-info {
-    font-style: italic;
-    color: #777;
+
+.comment-header .date {
+    white-space: nowrap;
+    margin-left: 15px; /* Add some space from the left content block */
+    /* align-self: flex-start; Ensure it aligns with the top of the header content */
+    margin-bottom: 4px; /* Consistent bottom margin if header wraps */
 }
 
 
@@ -148,4 +156,12 @@ a:hover {
 /* Utility class for hiding elements */
 .hidden {
     display: none;
+}
+
+.comment-channel-display {
+    font-size: 0.8em;
+    color: #6c757d; /* A slightly muted, secondary text color */
+    margin-top: 10px; /* Space between content and channel info */
+    padding-top: 5px; /* Optional: if a border is desired */
+    /* border-top: 1px solid #eeeeee; */ /* Optional: a light separator line */
 }

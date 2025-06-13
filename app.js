@@ -1,8 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const refreshButton = document.getElementById('refresh-button');
-    const commentsContainer = document.getElementById('comments-container');
+document.addEventListener("DOMContentLoaded", () => {
+    const refreshButton = document.getElementById("refresh-button");
+    const commentsContainer = document.getElementById("comments-container");
 
-    const ECP_API_URL = 'https://api.ethcomments.xyz/';
+    const ECP_API_URL = "https://api.ethcomments.xyz/";
     const COMMENTS_QUERY = `query MyQuery {
         comments {
             items {
@@ -18,24 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }`;
 
-    function showLoadingMessage(message = 'Loading comments...') {
+    function showLoadingMessage(message = "Loading comments...") {
         commentsContainer.innerHTML = `<p class="loading-message">${message}</p>`;
     }
 
-    function showErrorMessage(message = 'Error loading comments. Please try again.') {
+    function showErrorMessage(
+        message = "Error loading comments. Please try again."
+    ) {
         commentsContainer.innerHTML = `<p class="error-message">${message}</p>`;
     }
-    
-    function showNoCommentsMessage(message = 'No comments found.') {
+
+    function showNoCommentsMessage(message = "No comments found.") {
         commentsContainer.innerHTML = `<p class="no-comments-message">${message}</p>`;
     }
 
     async function fetchComments() {
         try {
             const response = await fetch(ECP_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ query: COMMENTS_QUERY })
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: JSON.stringify({query: COMMENTS_QUERY}),
             });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -43,7 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (result.errors) {
                 console.error("GraphQL Errors:", result.errors);
-                throw new Error(`GraphQL error: ${result.errors.map(e => e.message).join(', ')}`);
+                throw new Error(
+                    `GraphQL error: ${result.errors
+                        .map((e) => e.message)
+                        .join(", ")}`
+                );
             }
             return result.data.comments.items || [];
         } catch (error) {
@@ -54,13 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildCommentTree(comments) {
         const commentMap = new Map();
-        comments.forEach(comment => {
+        comments.forEach((comment) => {
             comment.children = [];
             commentMap.set(comment.id, comment);
         });
 
         const tree = [];
-        comments.forEach(comment => {
+        comments.forEach((comment) => {
             if (comment.parentId && commentMap.has(comment.parentId)) {
                 const parent = commentMap.get(comment.parentId);
                 parent.children.push(comment);
@@ -68,11 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 tree.push(comment); // Add to root if no parentId or parent not found in this batch
             }
         });
-        
+
         // Sort root comments and children by createdAt (newest first)
-        const sortByDate = (a, b) => parseInt(b.createdAt) - parseInt(a.createdAt);
+        const sortByDate = (a, b) =>
+            parseInt(b.createdAt) - parseInt(a.createdAt);
         tree.sort(sortByDate);
-        comments.forEach(comment => {
+        comments.forEach((comment) => {
             if (comment.children.length > 0) {
                 comment.children.sort(sortByDate);
             }
@@ -83,87 +93,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatAddress(address) {
         if (!address || address.length < 10) return address;
-        return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+        return `${address.substring(0, 6)}...${address.substring(
+            address.length - 4
+        )}`;
     }
-    
+
     function formatDate(timestamp) {
-        if (!timestamp) return 'Unknown date';
+        if (!timestamp) return "Unknown date";
         return new Date(parseInt(timestamp)).toLocaleString();
     }
 
     function renderComment(comment, depth = 0) {
-        const commentDiv = document.createElement('div');
-        commentDiv.classList.add('comment');
+        const commentDiv = document.createElement("div");
+        commentDiv.classList.add("comment");
         commentDiv.style.marginLeft = `${depth * 10}px`; // Indentation for replies
 
-        const header = document.createElement('div');
-        header.classList.add('comment-header');
-        
-        const authorLink = document.createElement('a');
+        const header = document.createElement("div");
+        header.classList.add("comment-header");
+
+        const headerInfoLeft = document.createElement("div");
+        headerInfoLeft.classList.add("comment-header-info-left");
+
+        const authorLink = document.createElement("a");
         authorLink.href = `https://etherscan.io/address/${comment.author}`;
-        authorLink.target = '_blank';
+        authorLink.target = "_blank";
         authorLink.textContent = formatAddress(comment.author);
-        const authorSpan = document.createElement('span');
-        authorSpan.classList.add('author');
+        const authorSpan = document.createElement("span");
+        authorSpan.classList.add("author");
         authorSpan.innerHTML = `<strong>Author:</strong> `;
         authorSpan.appendChild(authorLink);
 
-        const appLink = document.createElement('a');
+        const appLink = document.createElement("a");
         appLink.href = `https://etherscan.io/address/${comment.app}`;
-        appLink.target = '_blank';
+        appLink.target = "_blank";
         appLink.textContent = formatAddress(comment.app);
-        const appSpan = document.createElement('span');
-        appSpan.classList.add('app');
+        const appSpan = document.createElement("span");
+        appSpan.classList.add("app");
         appSpan.innerHTML = `<strong>App:</strong> `;
         appSpan.appendChild(appLink);
-        
-        const dateSpan = document.createElement('span');
-        dateSpan.classList.add('date');
-        dateSpan.textContent = `Date: ${formatDate(comment.createdAt)}`;
-        
-        const channelSpan = document.createElement('span');
-        channelSpan.classList.add('channel');
-        channelSpan.textContent = `Channel: ${comment.channelId}`;
 
-        header.appendChild(authorSpan);
-        header.appendChild(appSpan);
-        header.appendChild(dateSpan);
-        header.appendChild(channelSpan);
+        const dateSpan = document.createElement("span");
+        dateSpan.classList.add("date");
+        dateSpan.textContent = formatDate(comment.createdAt);
 
-        if (comment.parentId) {
-            const parentInfoSpan = document.createElement('span');
-            parentInfoSpan.classList.add('parent-info');
-            parentInfoSpan.textContent = `(reply to ${formatAddress(comment.parentId)})`;
-            header.appendChild(parentInfoSpan);
-        }
+        // const channelSpan = document.createElement('span'); // DELETE
+        // channelSpan.classList.add('channel'); // DELETE
+        // channelSpan.textContent = `Channel: ${comment.channelId}`; // DELETE
 
+        headerInfoLeft.appendChild(authorSpan);
+        headerInfoLeft.appendChild(appSpan);
+        // headerInfoLeft.appendChild(channelSpan); // DELETE
+
+        header.appendChild(headerInfoLeft);
+        header.appendChild(dateSpan); // dateSpan is now appended last to header
 
         commentDiv.appendChild(header);
 
-        const contentP = document.createElement('p');
-        contentP.classList.add('comment-content');
+        const contentP = document.createElement("p");
+        contentP.classList.add("comment-content");
         contentP.textContent = comment.content;
         commentDiv.appendChild(contentP);
 
+        if (comment.channelId && String(comment.channelId) !== "0") {
+            const channelDisplayDiv = document.createElement("div");
+            channelDisplayDiv.classList.add("comment-channel-display");
+            channelDisplayDiv.textContent = `Channel: ${comment.channelId}`;
+            commentDiv.appendChild(channelDisplayDiv);
+        }
+
         if (comment.children && comment.children.length > 0) {
-            const toggleButton = document.createElement('button');
-            toggleButton.classList.add('toggle-replies');
+            const toggleButton = document.createElement("button");
+            toggleButton.classList.add("toggle-replies");
             toggleButton.textContent = `[-] Hide Replies (${comment.children.length})`;
             commentDiv.appendChild(toggleButton);
 
-            const childrenContainer = document.createElement('div');
-            childrenContainer.classList.add('comment-children');
+            const childrenContainer = document.createElement("div");
+            childrenContainer.classList.add("comment-children");
             // childrenContainer.style.display = 'block'; // Default to shown
 
-            comment.children.forEach(reply => {
+            comment.children.forEach((reply) => {
                 childrenContainer.appendChild(renderComment(reply, depth + 1));
             });
             commentDiv.appendChild(childrenContainer);
 
             toggleButton.onclick = () => {
-                const isHidden = childrenContainer.classList.toggle('hidden');
-                toggleButton.textContent = isHidden 
-                    ? `[+] Show Replies (${comment.children.length})` 
+                const isHidden = childrenContainer.classList.toggle("hidden");
+                toggleButton.textContent = isHidden
+                    ? `[+] Show Replies (${comment.children.length})`
                     : `[-] Hide Replies (${comment.children.length})`;
             };
         }
@@ -174,23 +190,25 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoadingMessage();
         try {
             const comments = await fetchComments();
-            
+
             if (!comments || comments.length === 0) {
                 showNoCommentsMessage();
                 return;
             }
 
             const commentTree = buildCommentTree(comments);
-            commentsContainer.innerHTML = ''; // Clear loading/previous message
+            commentsContainer.innerHTML = ""; // Clear loading/previous message
 
             if (commentTree.length === 0) {
-                 // This case might happen if all comments are children and their parents are not in the batch,
-                 // or if buildCommentTree logic results in no roots.
-                showNoCommentsMessage("No root comments to display. All fetched items might be replies.");
+                // This case might happen if all comments are children and their parents are not in the batch,
+                // or if buildCommentTree logic results in no roots.
+                showNoCommentsMessage(
+                    "No root comments to display. All fetched items might be replies."
+                );
                 // As a fallback, you could render them flat:
                 // comments.forEach(comment => commentsContainer.appendChild(renderComment(comment, 0)));
             } else {
-                commentTree.forEach(comment => {
+                commentTree.forEach((comment) => {
                     commentsContainer.appendChild(renderComment(comment));
                 });
             }
@@ -199,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    refreshButton.addEventListener('click', displayComments);
+    refreshButton.addEventListener("click", displayComments);
 
     // Initial load
     displayComments();
