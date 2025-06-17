@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 content
                 createdAt
                 parentId
+                txHash
             }
         }
     }`;
@@ -34,7 +35,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     } else {
         if (!burgerMenuButton) console.warn("Burger menu button not found.");
-        if (!channelMenu) console.warn("Channel menu element not found for burger functionality.");
+        if (!channelMenu)
+            console.warn(
+                "Channel menu element not found for burger functionality."
+            );
     }
 
     function showLoadingMessage(message = "Loading comments...") {
@@ -175,6 +179,21 @@ document.addEventListener("DOMContentLoaded", () => {
             commentDiv.appendChild(channelDisplayDiv);
         }
 
+        // Add Transaction Hash Link
+        if (comment.txHash) {
+            const txLinkDiv = document.createElement("div");
+            txLinkDiv.classList.add("comment-tx-link"); // For styling
+
+            const txLink = document.createElement("a");
+            txLink.href = `https://sepolia.basescan.org/tx/${comment.txHash}`;
+            txLink.target = "_blank"; // Open in new tab
+            txLink.rel = "noopener noreferrer"; // Security best practice
+            txLink.textContent = "View Transaction"; // Or formatAddress(comment.txHash)
+
+            txLinkDiv.appendChild(txLink);
+            commentDiv.appendChild(txLinkDiv);
+        }
+
         if (comment.children && comment.children.length > 0) {
             const toggleButton = document.createElement("button");
             toggleButton.classList.add("toggle-replies");
@@ -202,7 +221,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function handleChannelClick(filterId) {
         displayFilteredComments(filterId);
         // Close burger menu if open on mobile
-        if (window.innerWidth <= 768) { // Check if on mobile view (matches CSS breakpoint)
+        if (window.innerWidth <= 768) {
+            // Check if on mobile view (matches CSS breakpoint)
             // const burger = document.getElementById("burger-menu-button"); // already defined as burgerMenuButton
             // const menu = document.getElementById("channel-menu"); // already defined as channelMenu
             if (channelMenu && channelMenu.classList.contains("open")) {
@@ -238,29 +258,39 @@ document.addEventListener("DOMContentLoaded", () => {
         const channelIds = new Set();
         let hasNoChannelComments = false;
 
-        allFetchedComments.forEach(comment => {
+        allFetchedComments.forEach((comment) => {
             const id = comment.channelId;
-            if (id === null || id === undefined || id === 0 || String(id) === "0") {
+            if (
+                id === null ||
+                id === undefined ||
+                id === 0 ||
+                String(id) === "0"
+            ) {
                 hasNoChannelComments = true;
             } else {
                 channelIds.add(id);
             }
         });
 
-        const viewAllButton = document.createElement('button');
-        viewAllButton.textContent = 'All Comments';
+        const viewAllButton = document.createElement("button");
+        viewAllButton.textContent = "All Comments";
         viewAllButton.onclick = () => handleChannelClick(null);
         if (currentChannelFilter === null) {
-            viewAllButton.classList.add('active-channel');
+            viewAllButton.classList.add("active-channel");
         }
         channelMenuContainer.appendChild(viewAllButton);
 
-        if (hasNoChannelComments || (allFetchedComments.length > 0 && !channelIds.size && !hasNoChannelComments)) {
-            const noChannelButton = document.createElement('button');
-            noChannelButton.textContent = 'No Channel';
+        if (
+            hasNoChannelComments ||
+            (allFetchedComments.length > 0 &&
+                !channelIds.size &&
+                !hasNoChannelComments)
+        ) {
+            const noChannelButton = document.createElement("button");
+            noChannelButton.textContent = "No Channel";
             noChannelButton.onclick = () => handleChannelClick(0);
             if (currentChannelFilter === 0 && currentChannelFilter !== null) {
-                noChannelButton.classList.add('active-channel');
+                noChannelButton.classList.add("active-channel");
             }
             channelMenuContainer.appendChild(noChannelButton);
         }
@@ -276,12 +306,16 @@ document.addEventListener("DOMContentLoaded", () => {
             return valA.localeCompare(valB);
         });
 
-        sortedChannelIds.forEach(channelId => {
-            const channelButton = document.createElement('button');
+        sortedChannelIds.forEach((channelId) => {
+            const channelButton = document.createElement("button");
             channelButton.textContent = `Channel: ${channelId}`;
             channelButton.onclick = () => handleChannelClick(channelId);
-            if (currentChannelFilter !== null && currentChannelFilter !== 0 && String(currentChannelFilter) === String(channelId)) {
-                channelButton.classList.add('active-channel');
+            if (
+                currentChannelFilter !== null &&
+                currentChannelFilter !== 0 &&
+                String(currentChannelFilter) === String(channelId)
+            ) {
+                channelButton.classList.add("active-channel");
             }
             channelMenuContainer.appendChild(channelButton);
         });
@@ -291,14 +325,24 @@ document.addEventListener("DOMContentLoaded", () => {
         currentChannelFilter = filterChannelId;
 
         let commentsToDisplay;
-        if (currentChannelFilter === null) { // "All Comments"
+        if (currentChannelFilter === null) {
+            // "All Comments"
             commentsToDisplay = allFetchedComments;
-        } else if (currentChannelFilter === 0) { // "No Channel"
-            commentsToDisplay = allFetchedComments.filter(comment =>
-                comment.channelId === null || comment.channelId === undefined || comment.channelId === 0 || String(comment.channelId) === "0"
+        } else if (currentChannelFilter === 0) {
+            // "No Channel"
+            commentsToDisplay = allFetchedComments.filter(
+                (comment) =>
+                    comment.channelId === null ||
+                    comment.channelId === undefined ||
+                    comment.channelId === 0 ||
+                    String(comment.channelId) === "0"
             );
-        } else { // Specific channel
-            commentsToDisplay = allFetchedComments.filter(comment => String(comment.channelId) === String(currentChannelFilter));
+        } else {
+            // Specific channel
+            commentsToDisplay = allFetchedComments.filter(
+                (comment) =>
+                    String(comment.channelId) === String(currentChannelFilter)
+            );
         }
 
         commentsContainer.innerHTML = ""; // Clear previous comments
@@ -312,7 +356,9 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             const commentTree = buildCommentTree(commentsToDisplay);
             if (commentTree.length === 0 && commentsToDisplay.length > 0) {
-                showNoCommentsMessage("No root comments for this filter. All matching items might be replies.");
+                showNoCommentsMessage(
+                    "No root comments for this filter. All matching items might be replies."
+                );
             } else {
                 commentTree.forEach((comment) => {
                     commentsContainer.appendChild(renderComment(comment));
@@ -330,15 +376,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (allFetchedComments.length === 0) {
                 showNoCommentsMessage();
-                renderChannelMenu(); 
+                renderChannelMenu();
                 return;
             }
-            displayFilteredComments(null); 
-
+            displayFilteredComments(null);
         } catch (error) {
             allFetchedComments = [];
             showErrorMessage(`Failed to load comments: ${error.message}`);
-            renderChannelMenu(); 
+            renderChannelMenu();
         }
     }
 

@@ -223,6 +223,19 @@ a:hover {
     padding-top: 5px; 
 }
 
+/* New style for transaction link */
+.comment-tx-link {
+    font-size: 0.8em;
+    color: #6c757d; /* Same color as channel display */
+    margin-top: 8px; /* Spacing from elements above */
+    padding-top: 5px; /* Optional: if you want a top border or more space */
+}
+
+.comment-tx-link a {
+    /* Inherits general 'a' styles (color: #2980b9;) */
+    /* You can add specific styles here if needed */
+}
+
 /* Burger Menu Button Styles */
 #burger-menu-button {
     display: none; /* Hidden by default, shown in media query */
