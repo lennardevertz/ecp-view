@@ -14,11 +14,13 @@ header {
     display: flex;
     align-items: center;
     border-bottom: 3px solid #3498db;
+    position: relative; /* For potential absolute positioning of menu or burger */
 }
 
 #logo {
     height: 40px;
     margin-right: 15px;
+    cursor: pointer; /* Added for better UX as it's clickable */
 }
 
 header h1 {
@@ -27,17 +29,75 @@ header h1 {
 }
 
 main {
-    max-width: 900px;
+    max-width: 1200px; /* Increased max-width to accommodate menu */
     margin: 20px auto;
     padding: 20px;
     background-color: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
     border-radius: 8px;
+    display: flex; 
+    gap: 20px; 
 }
+
+#channel-menu {
+    width: 200px; 
+    flex-shrink: 0; 
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    height: fit-content; 
+    max-height: calc(100vh - 150px); 
+    overflow-y: auto;
+}
+
+#channel-menu h3 { 
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+#channel-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 8px;
+    text-align: left;
+    background-color: #e9ecef;
+    color: #343a40;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#channel-menu button:hover {
+    background-color: #dee2e6;
+    border-color: #adb5bd;
+}
+
+#channel-menu button.active-channel {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+    font-weight: bold;
+}
+
+#main-content {
+    flex-grow: 1; 
+    min-width: 0; 
+}
+
 
 .controls {
     margin-bottom: 20px;
-    text-align: right;
+    display: flex; /* Added */
+    justify-content: space-between; /* Added */
+    align-items: center; /* Added */
 }
 
 #refresh-button {
@@ -85,8 +145,8 @@ main {
     margin-bottom: 8px;
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start; /* MODIFIED */
-    justify-content: space-between; /* ADDED */
+    align-items: flex-start; 
+    justify-content: space-between; 
 }
 
 .comment-header strong {
@@ -95,36 +155,35 @@ main {
 
 .comment-header-info-left {
     display: flex;
-    flex-wrap: wrap; /* Allow items to wrap within the left block */
-    align-items: center; /* Align items like author, app, channel vertically */
+    flex-wrap: wrap; 
+    align-items: center; 
 }
 
 .comment-header-info-left .author,
 .comment-header-info-left .app {
     margin-right: 12px;
     white-space: nowrap;
-    margin-bottom: 4px; /* Add a small bottom margin for when items wrap */
+    margin-bottom: 4px; 
 }
 
 .comment-header .date {
     white-space: nowrap;
-    margin-left: 15px; /* Add some space from the left content block */
-    /* align-self: flex-start; Ensure it aligns with the top of the header content */
-    margin-bottom: 4px; /* Consistent bottom margin if header wraps */
+    margin-left: 15px; 
+    margin-bottom: 4px; 
 }
 
 
 .comment-content {
     margin-top: 5px;
     margin-bottom: 10px;
-    white-space: pre-wrap; /* Preserve line breaks in content */
+    white-space: pre-wrap; 
     word-wrap: break-word;
 }
 
 .comment-children {
     margin-top: 10px;
-    padding-left: 20px; /* Visual cue for nesting, actual indent by margin */
-    border-left: 2px solid #e0e0e0; /* Subtle left border for thread line */
+    padding-left: 20px; 
+    border-left: 2px solid #e0e0e0; 
 }
 
 .toggle-replies {
@@ -153,15 +212,108 @@ a:hover {
     text-decoration: underline;
 }
 
-/* Utility class for hiding elements */
 .hidden {
     display: none;
 }
 
 .comment-channel-display {
     font-size: 0.8em;
-    color: #6c757d; /* A slightly muted, secondary text color */
-    margin-top: 10px; /* Space between content and channel info */
-    padding-top: 5px; /* Optional: if a border is desired */
-    /* border-top: 1px solid #eeeeee; */ /* Optional: a light separator line */
+    color: #6c757d; 
+    margin-top: 10px; 
+    padding-top: 5px; 
+}
+
+/* Burger Menu Button Styles */
+#burger-menu-button {
+    display: none; /* Hidden by default, shown in media query */
+    background: none;
+    border: none;
+    padding: 10px; /* Padding provides clickable area */
+    cursor: pointer;
+    z-index: 1001; /* Ensure it's above other elements if menu overlays */
+    /* margin-right: 10px; /* Removed or adjust if needed for new context */
+}
+
+#burger-menu-button span {
+    display: block;
+    width: 22px;
+    height: 3px;
+    background-color: #333; /* Dark color for light background */
+    margin: 4px 0;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Styles for when the menu is open (X icon) */
+#burger-menu-button.open span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+#burger-menu-button.open span:nth-child(2) {
+    opacity: 0;
+}
+#burger-menu-button.open span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Media Query for Mobile View */
+@media (max-width: 768px) {
+    header {
+        /* position: relative; already set above */
+    }
+
+    #burger-menu-button {
+        display: block; /* Show burger button on mobile */
+    }
+
+    /* Added rule for fixed position of X button when menu is open */
+    #burger-menu-button.open {
+        position: fixed;
+        top: 15px;   /* Adjust for desired padding from the top edge of the viewport/menu */
+        left: 15px;  /* Adjust for desired padding from the left edge of the viewport/menu */
+        /* z-index is already 1001, which is correct to keep it above the menu panel (z-index: 1000) */
+    }
+
+    main {
+        flex-direction: column; /* Stack menu and content vertically if menu is part of flow */
+                               /* This might not be strictly necessary if menu is fixed and overlays */
+    }
+
+    #channel-menu {
+        position: fixed; 
+        left: 0;
+        top: 0; /* Start from the very top */
+        width: 250px; 
+        height: 100vh; /* Full height */
+        background-color: #f8f9fa;
+        z-index: 1000; /* Above other content */
+        transform: translateX(-100%); /* Initially off-screen */
+        transition: transform 0.3s ease-in-out;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        /* Adjusted padding for consistent spacing and to accommodate the fixed 'X' button */
+        padding: 60px 15px 15px 15px; /* Top, Right, Bottom, Left */
+        overflow-y: auto; /* Ensure menu content is scrollable if it exceeds height */
+        max-height: 100vh; /* Ensure it doesn't exceed viewport height */
+        border-right: 1px solid #ccc; /* Add a border to distinguish from content */
+        box-sizing: border-box; /* Ensures padding and border don't increase the specified width/height */
+    }
+
+    #channel-menu.open {
+        transform: translateX(0); /* Slide in */
+    }
+
+    #main-content {
+        width: 100%; /* Ensure main content takes full width when menu is an overlay */
+        margin-left: 0; /* Reset margin if it was affected by flexbox gap on desktop */
+    }
+
+    /* Optional: Add an overlay for the rest of the page when menu is open */
+    body.menu-open-overlay::after {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999; /* Below menu, above content */
+    }
 }

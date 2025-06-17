@@ -13,11 +13,21 @@
         <h1>Ethereum Comments Protocol Viewer</h1>
     </header>
     <main>
-        <div class="controls">
-            <button id="refresh-button">Refresh Comments</button>
+        <div id="channel-menu">
+            <!-- Channel buttons will be dynamically added here by JavaScript -->
         </div>
-        <div id="comments-container">
-            <p class="loading-message">Loading comments...</p>
+        <div id="main-content">
+            <div class="controls">
+                <button id="burger-menu-button" aria-label="Toggle channel menu" aria-expanded="false">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <button id="refresh-button">Refresh Comments</button>
+            </div>
+            <div id="comments-container">
+                <p class="loading-message">Loading comments...</p>
+            </div>
         </div>
     </main>
     <script src="app.js"></script>
