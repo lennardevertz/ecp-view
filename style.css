@@ -223,18 +223,53 @@ a:hover {
     padding-top: 5px; 
 }
 
-/* New style for transaction link */
 .comment-tx-link {
     font-size: 0.8em;
-    color: #6c757d; /* Same color as channel display */
-    margin-top: 8px; /* Spacing from elements above */
-    padding-top: 5px; /* Optional: if you want a top border or more space */
+    color: #6c757d;
+    margin-top: 8px;
+    padding-top: 5px;
 }
 
 .comment-tx-link a {
-    /* Inherits general 'a' styles (color: #2980b9;) */
-    /* You can add specific styles here if needed */
+    /* Inherits general 'a' styles */
 }
+
+/* Like Section Styles */
+.like-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+.like-count {
+    color: #555;
+}
+
+.like-button {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    color: #333;
+    padding: 4px 10px;
+    border-radius: 15px; /* Pill shape */
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.like-button:hover {
+    background-color: #e0e0e0;
+    border-color: #bbb;
+}
+
+.like-button:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+    border-color: #ced4da;
+}
+
 
 /* Burger Menu Button Styles */
 #burger-menu-button {
@@ -276,16 +311,20 @@ a:hover {
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9em;
+    /* Added for better text handling */
+    max-width: 200px; /* Adjust as needed */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; 
+    text-align: center; /* If text is shorter than max-width */
 }
 #connect-wallet-button:disabled {
     background-color: #95a5a6;
     cursor: default;
+    /* Ensure text color remains readable when disabled and potentially long */
+    color: #e0e0e0; 
 }
-#wallet-status {
-    margin-left: 10px;
-    font-size: 0.9em;
-    color: #ecf0f1; /* Match header text color */
-}
+/* Removed #wallet-status rule */
 
 #new-comment-area {
     background-color: #fdfdfd; /* Slightly off-white */
@@ -336,24 +375,10 @@ a:hover {
     border-radius: 4px;
     display: none; /* Hidden by default, shown by JS */
 }
-/* Specific styling for status messages if needed, JS sets color directly for now */
-/*
-#post-status-message.error, .reply-status-message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-#post-status-message.success, .reply-status-message.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-*/
-
 
 /* Reply Button and Form Styles */
 .reply-button-container {
-    margin-top: 10px;
+    margin-top: 10px; /* Ensure spacing if like section is also present */
 }
 .reply-button, .reply-form button {
     font-size: 0.85em;
@@ -410,10 +435,10 @@ a:hover {
 .reply-form .cancel-reply-button:hover {
     background-color: #dadedf;
 }
-.reply-status-message { /* Already styled by .status-message, JS handles color */
+.reply-status-message { 
     font-size: 0.85em !important; 
     margin-top: 8px !important;
-    padding: 5px !important; /* Smaller padding for reply status */
+    padding: 5px !important; 
 }
 
 
@@ -427,11 +452,10 @@ a:hover {
         display: block; /* Show burger button on mobile */
     }
 
-    /* Added rule for fixed position of X button when menu is open */
     #burger-menu-button.open {
         position: fixed;
-        top: 15px;   /* Adjust for desired padding from the top edge of the viewport/menu */
-        left: 15px;  /* Adjust for desired padding from the left edge of the viewport/menu */
+        top: 15px;   
+        left: 15px;  
     }
 
     main {
@@ -474,5 +498,11 @@ a:hover {
         height: 100%;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 999; 
+    }
+
+    #connect-wallet-button {
+        max-width: 150px; /* More aggressive max-width for mobile */
+        /* font-size: 0.8em; /* Optionally reduce font size */
+        /* padding: 6px 10px; /* Optionally reduce padding */
     }
 }

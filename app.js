@@ -68,6 +68,10 @@ const BASE_SEPOLIA_RPC_URL = "https://sepolia.base.org";
 const BASE_SEPOLIA_EXPLORER_URL = "https://sepolia-explorer.base.org";
 const BASE_SEPOLIA_CHAIN_NAME = "Base Sepolia Testnet";
 
+// Add these for reactions:
+const COMMENT_TYPE_REACTION = 1;
+const REACTION_CONTENT_LIKE = "like";
+
 // Wallet related global variables
 let eip6963Providers = []; // To store discovered EIP-6963 providers
 let selectedProviderDetail = null; // To store the EIP6963ProviderDetail of the chosen wallet
@@ -76,6 +80,8 @@ let signer;
 let userAddress;
 let commentManagerContract;
 let isOnCorrectNetwork = false; // New global flag
+window.currentLikeCounts = new Map(); // To store like counts for comments
+let isInitialLoad = true; // <-- Add this line
 
 document.addEventListener("DOMContentLoaded", () => {
     const refreshButton = document.getElementById("refresh-button");
@@ -88,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const connectWalletButton = document.getElementById(
         "connect-wallet-button"
     );
-    const walletStatusSpan = document.getElementById("wallet-status");
+    // const walletStatusSpan = document.getElementById("wallet-status"); // Removed
     const newCommentArea = document.getElementById("new-comment-area");
     const newCommentContent = document.getElementById("new-comment-content");
     const newCommentChannelId = document.getElementById(
@@ -136,11 +142,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 connectWalletButton &&
                 connectWalletButton.disabled &&
                 eip6963Providers.length > 0 &&
-                !userAddress
+                !userAddress // Only update if not already connected
             ) {
                 connectWalletButton.disabled = false;
                 connectWalletButton.textContent = "Connect Wallet";
-                walletStatusSpan.textContent = `${eip6963Providers.length} wallet(s) available.`;
             }
         }
     }
@@ -157,23 +162,18 @@ document.addEventListener("DOMContentLoaded", () => {
         // After a short delay, if no providers found, update status
         setTimeout(() => {
             if (eip6963Providers.length === 0 && !userAddress) {
-                // Check !userAddress to not override "Connected" status
                 if (connectWalletButton) {
                     connectWalletButton.disabled = true;
                     connectWalletButton.textContent = "No Wallets Found";
                 }
-                if (walletStatusSpan) {
-                    walletStatusSpan.textContent =
-                        "No EIP-6963 wallets detected.";
-                }
             } else if (eip6963Providers.length > 0 && !userAddress) {
-                if (connectWalletButton) {
+                if (
+                    connectWalletButton &&
+                    connectWalletButton.textContent === "Detecting Wallets..."
+                ) {
+                    // Only if not already set by other logic
                     connectWalletButton.disabled = false;
                     connectWalletButton.textContent = "Connect Wallet";
-                }
-                // Update status to reflect number of wallets or a generic message
-                if (walletStatusSpan) {
-                    walletStatusSpan.textContent = `${eip6963Providers.length} wallet(s) available.`;
                 }
             }
         }, 1000); // Adjust timeout as needed
@@ -281,8 +281,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 "No wallet providers found. Please ensure your EIP-6963 compatible wallet is active.",
                 true
             );
-            if (walletStatusSpan)
-                walletStatusSpan.textContent = "No wallets detected.";
+            if (connectWalletButton)
+                connectWalletButton.textContent = "No Wallets Detected";
             return;
         }
 
@@ -317,8 +317,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 const switched = await switchToBaseSepolia(rawProvider);
                 if (!switched) {
                     isOnCorrectNetwork = false;
-                    if (walletStatusSpan)
-                        walletStatusSpan.textContent = `Wrong Network. Please switch to ${BASE_SEPOLIA_CHAIN_NAME}.`;
+                    if (connectWalletButton) {
+                        connectWalletButton.textContent = `Switch to ${BASE_SEPOLIA_CHAIN_NAME.replace(
+                            " Testnet",
+                            ""
+                        )}`;
+                        connectWalletButton.disabled = false; // Allow user to click again to try switching
+                    }
                     if (newCommentArea) newCommentArea.style.display = "none";
                     showPostStatus(
                         `Please switch your wallet to ${BASE_SEPOLIA_CHAIN_NAME} to proceed.`,
@@ -343,12 +348,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 signer
             );
 
-            if (walletStatusSpan)
-                walletStatusSpan.textContent = `Connected: ${formatAddress(
+            if (connectWalletButton) {
+                connectWalletButton.textContent = `${formatAddress(
                     userAddress
                 )}`;
-            if (connectWalletButton) {
-                connectWalletButton.textContent = "Wallet Connected";
                 connectWalletButton.disabled = true;
             }
             if (newCommentArea) newCommentArea.style.display = "block";
@@ -360,9 +363,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 error
             );
             isOnCorrectNetwork = false;
-            if (walletStatusSpan)
-                walletStatusSpan.textContent =
-                    "Connection/Network Switch failed.";
             selectedProviderDetail = null;
             showPostStatus(
                 `Error: ${
@@ -370,6 +370,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }`,
                 true
             );
+            if (connectWalletButton) {
+                connectWalletButton.textContent =
+                    eip6963Providers.length > 0
+                        ? "Connect Wallet"
+                        : "No Wallets Found";
+                connectWalletButton.disabled = eip6963Providers.length === 0;
+            }
             if (newCommentArea) newCommentArea.style.display = "none";
             initializeCommentsView(); // Re-render to update reply buttons state
         }
@@ -379,7 +386,8 @@ document.addEventListener("DOMContentLoaded", () => {
         content,
         channelIdStr,
         parentId,
-        statusElement = postStatusMessage
+        statusElement = postStatusMessage,
+        commentTypeParam = 0 // Default to 0 (standard comment)
     ) {
         if (!signer || !commentManagerContract) {
             showPostStatus(
@@ -390,9 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return Promise.reject("Wallet not connected");
         }
 
-        // Add this network check
         if (!isOnCorrectNetwork || !ethersProvider) {
-            // Also check ethersProvider for safety
             showPostStatus(
                 `Please connect to the ${BASE_SEPOLIA_CHAIN_NAME} network to post.`,
                 true,
@@ -400,22 +406,29 @@ document.addEventListener("DOMContentLoaded", () => {
             );
             return Promise.reject("Wrong network or provider not ready");
         }
-        // Double check current network with provider, in case it changed outside our flow
         const network = await ethersProvider.getNetwork();
         if (network.chainId !== TARGET_CHAIN_ID) {
-            isOnCorrectNetwork = false; // Update global flag
+            isOnCorrectNetwork = false;
             showPostStatus(
                 `You are on the wrong network. Please switch to ${BASE_SEPOLIA_CHAIN_NAME}.`,
                 true,
                 statusElement
             );
-            if (newCommentArea) newCommentArea.style.display = "none"; // Hide main comment area
-            initializeCommentsView(); // Re-render comments to disable reply buttons
+            if (connectWalletButton && userAddress) {
+                // Update button if user was connected
+                connectWalletButton.textContent = `${formatAddress(
+                    userAddress
+                )}`;
+                connectWalletButton.disabled = false;
+            }
+            if (newCommentArea) newCommentArea.style.display = "none";
+            initializeCommentsView();
             return Promise.reject("Wrong network");
         }
-        // End of network check
 
-        if (!content.trim()) {
+        if (commentTypeParam !== COMMENT_TYPE_REACTION && !content.trim()) {
+            // Content can be empty for certain reaction types, but not for standard comments
+            // For "like" reactions, content is fixed, so this check is mostly for standard comments.
             showPostStatus(
                 "Comment content cannot be empty.",
                 true,
@@ -441,16 +454,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const commentData = {
             author: userAddress,
-            app: userAddress, // For this example, app is the same as author. Adjust if different.
+            app: userAddress,
             channelId: ethers.BigNumber.from(channelId),
             deadline: ethers.BigNumber.from(
                 Math.floor(Date.now() / 1000) + 86400
-            ), // 1 day from now
+            ),
             parentId: parentId || ethers.constants.HashZero,
-            commentType: 0, // Standard comment
+            commentType: commentTypeParam, // Use the passed parameter
             content: content,
-            metadata: [], // No metadata for this example
-            targetUri: "", // No target URI for this example
+            metadata: [],
+            targetUri: "",
         };
 
         try {
@@ -462,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const tx = await commentManagerContract.postComment(
                 commentData,
                 "0x"
-            ); // Assuming no app signature needed for this setup
+            );
             showPostStatus(
                 `Transaction sent: ${formatAddress(
                     tx.hash
@@ -473,33 +486,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await tx.wait();
             showPostStatus(
-                "Comment posted successfully! Refreshing comments...",
+                "Action completed successfully! Refreshing comments...",
                 false,
                 statusElement
             );
 
-            if (!parentId || parentId === ethers.constants.HashZero) {
-                // Clear main form if it was a new comment
+            if (
+                (!parentId || parentId === ethers.constants.HashZero) &&
+                commentTypeParam !== COMMENT_TYPE_REACTION
+            ) {
                 if (newCommentContent) newCommentContent.value = "";
                 if (newCommentChannelId) newCommentChannelId.value = "";
             }
-            // Reply form clearing will be handled in its own scope by the caller
 
             setTimeout(() => {
-                initializeCommentsView(); // Refresh the entire view
-                showPostStatus("", false, statusElement); // Clear status after refresh
-            }, 3000); // Delay to allow indexer to catch up
+                initializeCommentsView();
+                showPostStatus("", false, statusElement);
+            }, 5000); // Increased delay for indexer (5 seconds)
             return Promise.resolve();
         } catch (error) {
-            console.error("Error posting comment:", error);
+            console.error("Error performing action:", error);
             const errMsg =
                 error.data?.message ||
                 error.reason ||
                 error.message ||
-                "Failed to post comment.";
+                "Failed to perform action.";
             showPostStatus(`Error: ${errMsg}`, true, statusElement);
             return Promise.reject(error);
         }
+    }
+
+    function processCommentsAndLikes(comments) {
+        const likeCounts = new Map(); // Map<parentId, count>
+        const contentComments = []; // Array of comments that are not "likes"
+
+        comments.forEach((comment) => {
+            if (
+                comment.commentType === COMMENT_TYPE_REACTION &&
+                comment.content === REACTION_CONTENT_LIKE &&
+                comment.parentId
+            ) {
+                // This is a "like" reaction
+                likeCounts.set(
+                    comment.parentId,
+                    (likeCounts.get(comment.parentId) || 0) + 1
+                );
+            } else {
+                // This is a regular comment or another type of reaction we're not specifically handling as a "like count"
+                contentComments.push(comment);
+            }
+        });
+        return {contentComments, likeCounts};
     }
 
     async function fetchComments() {
@@ -527,7 +564,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return result.data.comments.items || [];
         } catch (error) {
             console.error("Error fetching comments:", error);
-            throw error; // Re-throw to be caught
+            throw error;
         }
     }
 
@@ -544,11 +581,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 const parent = commentMap.get(comment.parentId);
                 parent.children.push(comment);
             } else {
-                tree.push(comment); // Add to root if no parentId or parent not found in this batch
+                tree.push(comment);
             }
         });
 
-        // Sort root comments and children by createdAt (newest first)
         const sortByDate = (a, b) =>
             parseInt(b.createdAt) - parseInt(a.createdAt);
         tree.sort(sortByDate);
@@ -576,7 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderComment(comment, depth = 0) {
         const commentDiv = document.createElement("div");
         commentDiv.classList.add("comment");
-        commentDiv.style.marginLeft = `${depth * 10}px`; // Indentation for replies
+        commentDiv.style.marginLeft = `${depth * 10}px`;
 
         const header = document.createElement("div");
         header.classList.add("comment-header");
@@ -626,27 +662,70 @@ document.addEventListener("DOMContentLoaded", () => {
             commentDiv.appendChild(channelDisplayDiv);
         }
 
-        // Add Transaction Hash Link
         if (comment.txHash) {
             const txLinkDiv = document.createElement("div");
-            txLinkDiv.classList.add("comment-tx-link"); // For styling
-
+            txLinkDiv.classList.add("comment-tx-link");
             const txLink = document.createElement("a");
             txLink.href = `https://sepolia.basescan.org/tx/${comment.txHash}`;
-            txLink.target = "_blank"; // Open in new tab
-            txLink.rel = "noopener noreferrer"; // Security best practice
-            txLink.textContent = "View Transaction"; // Or formatAddress(comment.txHash)
-
+            txLink.target = "_blank";
+            txLink.rel = "noopener noreferrer";
+            txLink.textContent = "View Transaction";
             txLinkDiv.appendChild(txLink);
             commentDiv.appendChild(txLinkDiv);
         }
 
-        // Add Reply Button and Form
-        if (userAddress && isOnCorrectNetwork) {
-            // Only show if wallet is connected AND on correct network
-            const replyButtonContainer = document.createElement("div"); // Container for button
-            replyButtonContainer.classList.add("reply-button-container");
+        // Add Like Count and Like Button
+        const likeSectionDiv = document.createElement("div");
+        likeSectionDiv.classList.add("like-section");
 
+        const likeCountSpan = document.createElement("span");
+        likeCountSpan.classList.add("like-count");
+        const currentLikes = window.currentLikeCounts.get(comment.id) || 0;
+        likeCountSpan.textContent = `❤️ ${currentLikes}`;
+        likeSectionDiv.appendChild(likeCountSpan);
+
+        if (userAddress && isOnCorrectNetwork) {
+            const likeButton = document.createElement("button");
+            likeButton.classList.add("like-button");
+            likeButton.textContent = "Like";
+
+            likeButton.onclick = async () => {
+                likeButton.disabled = true;
+                likeButton.textContent = "Liking...";
+
+                const parentChannelId =
+                    comment.channelId && String(comment.channelId) !== "0"
+                        ? String(comment.channelId)
+                        : "0";
+                let success = false;
+                try {
+                    await submitEcpComment(
+                        REACTION_CONTENT_LIKE,
+                        parentChannelId,
+                        comment.id,
+                        postStatusMessage, // Using global status for simplicity
+                        COMMENT_TYPE_REACTION
+                    );
+                    success = true;
+                    // On success, submitEcpComment schedules a refresh, button will be re-rendered.
+                } catch (error) {
+                    // Error message is handled by submitEcpComment.
+                } finally {
+                    if (!success) {
+                        // If not successful, reset the button state.
+                        likeButton.textContent = "Like";
+                        likeButton.disabled = false;
+                    }
+                    // If successful, the button is gone due to refresh.
+                }
+            };
+            likeSectionDiv.appendChild(likeButton);
+        }
+        commentDiv.appendChild(likeSectionDiv);
+
+        if (userAddress && isOnCorrectNetwork) {
+            const replyButtonContainer = document.createElement("div");
+            replyButtonContainer.classList.add("reply-button-container");
             const replyButton = document.createElement("button");
             replyButton.classList.add("reply-button");
             replyButton.textContent = "Reply";
@@ -655,7 +734,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const replyFormDiv = document.createElement("div");
             replyFormDiv.classList.add("reply-form");
-            replyFormDiv.style.display = "none"; // Initially hidden
+            replyFormDiv.style.display = "none";
             replyFormDiv.innerHTML = `
                 <textarea placeholder="Write your reply..." rows="2"></textarea>
                 <button class="submit-reply-button">Post Reply</button>
@@ -680,26 +759,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 replyFormDiv.style.display = isVisible ? "none" : "block";
                 replyButtonContainer.style.display = isVisible
                     ? "block"
-                    : "none"; // Hide "Reply" button when form is open
+                    : "none";
                 if (!isVisible) replyTextarea.focus();
-                showPostStatus("", false, replyStatusMsgElement); // Clear status
+                showPostStatus("", false, replyStatusMsgElement);
             };
 
             cancelReplyBtn.onclick = () => {
                 replyFormDiv.style.display = "none";
-                replyButtonContainer.style.display = "block"; // Show "Reply" button again
+                replyButtonContainer.style.display = "block";
                 replyTextarea.value = "";
                 showPostStatus("", false, replyStatusMsgElement);
             };
 
             submitReplyBtn.onclick = async () => {
                 const replyContent = replyTextarea.value;
-                // Replies inherit the parent's channelId. If parent has no channel or "0", reply gets "0".
                 const parentChannelId =
                     comment.channelId && String(comment.channelId) !== "0"
                         ? String(comment.channelId)
                         : "0";
-
                 submitReplyBtn.disabled = true;
                 cancelReplyBtn.disabled = true;
                 showPostStatus(
@@ -707,22 +784,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     false,
                     replyStatusMsgElement
                 );
-
                 try {
                     await submitEcpComment(
                         replyContent,
                         parentChannelId,
                         comment.id,
                         replyStatusMsgElement
+                        // Implicitly commentType 0 for replies
                     );
-                    // On success, submitEcpComment handles main refresh. Clear local form.
                     replyTextarea.value = "";
                     replyFormDiv.style.display = "none";
                     replyButtonContainer.style.display = "block";
-                    // Status is cleared by submitEcpComment after timeout
                 } catch (e) {
-                    // Error message is set by submitEcpComment
-                    // No need to do anything here as submitEcpComment handles the status message
+                    // Error handled by submitEcpComment
                 } finally {
                     submitReplyBtn.disabled = false;
                     cancelReplyBtn.disabled = false;
@@ -738,7 +812,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const childrenContainer = document.createElement("div");
             childrenContainer.classList.add("comment-children");
-
             comment.children.forEach((reply) => {
                 childrenContainer.appendChild(renderComment(reply, depth + 1));
             });
@@ -756,7 +829,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function handleChannelClick(filterId) {
         displayFilteredComments(filterId);
-        // Close burger menu if open on mobile
         if (window.innerWidth <= 768) {
             if (channelMenu && channelMenu.classList.contains("open")) {
                 channelMenu.classList.remove("open");
@@ -775,20 +847,14 @@ document.addEventListener("DOMContentLoaded", () => {
             console.warn("Channel menu container not found.");
             return;
         }
-
-        channelMenuContainer.innerHTML = ""; // Clear previous menu items
-
+        channelMenuContainer.innerHTML = "";
         const menuTitle = document.createElement("h3");
         menuTitle.textContent = "Channels";
         channelMenuContainer.appendChild(menuTitle);
 
-        if (allFetchedComments.length === 0 && currentChannelFilter === null) {
-            // Logic below will handle adding "All Comments" button.
-        }
-
+        // Note: allFetchedComments here refers to content comments only (after processing)
         const channelIds = new Set();
         let hasNoChannelComments = false;
-
         allFetchedComments.forEach((comment) => {
             const id = comment.channelId;
             if (
@@ -806,9 +872,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const viewAllButton = document.createElement("button");
         viewAllButton.textContent = "All Comments";
         viewAllButton.onclick = () => handleChannelClick(null);
-        if (currentChannelFilter === null) {
+        if (currentChannelFilter === null)
             viewAllButton.classList.add("active-channel");
-        }
         channelMenuContainer.appendChild(viewAllButton);
 
         if (
@@ -831,9 +896,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const valB = String(b);
             const numA = parseFloat(valA);
             const numB = parseFloat(valB);
-            if (!isNaN(numA) && !isNaN(numB)) {
-                return numA - numB;
-            }
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
             return valA.localeCompare(valB);
         });
 
@@ -854,13 +917,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function displayFilteredComments(filterChannelId) {
         currentChannelFilter = filterChannelId;
-
         let commentsToDisplay;
+        // allFetchedComments here are content comments (already filtered from likes)
         if (currentChannelFilter === null) {
-            // "All Comments"
             commentsToDisplay = allFetchedComments;
         } else if (currentChannelFilter === 0) {
-            // "No Channel"
             commentsToDisplay = allFetchedComments.filter(
                 (comment) =>
                     comment.channelId === null ||
@@ -869,20 +930,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     String(comment.channelId) === "0"
             );
         } else {
-            // Specific channel
             commentsToDisplay = allFetchedComments.filter(
                 (comment) =>
                     String(comment.channelId) === String(currentChannelFilter)
             );
         }
 
-        commentsContainer.innerHTML = ""; // Clear previous comments
-
+        commentsContainer.innerHTML = "";
         if (commentsToDisplay.length === 0) {
             if (allFetchedComments.length > 0) {
+                // Content comments exist, but not for this filter
                 showNoCommentsMessage("No comments found for this filter.");
             } else {
-                showNoCommentsMessage(); // Default "No comments found."
+                // No content comments at all (after initial processing)
+                // This case is handled by initializeCommentsView before calling displayFilteredComments
+                // However, if allFetchedComments was empty to begin with, this is the right message.
+                showNoCommentsMessage();
             }
         } else {
             const commentTree = buildCommentTree(commentsToDisplay);
@@ -896,76 +959,123 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
         }
-        renderChannelMenu(); // Update menu to show active filter
+        renderChannelMenu();
     }
 
     async function initializeCommentsView() {
-        showLoadingMessage();
-        try {
-            // Update wallet status display based on current state
-            if (userAddress && !isOnCorrectNetwork && walletStatusSpan) {
-                walletStatusSpan.textContent = `Connected: ${formatAddress(
-                    userAddress
-                )} (Wrong Network - Switch to ${BASE_SEPOLIA_CHAIN_NAME})`;
-            } else if (userAddress && isOnCorrectNetwork && walletStatusSpan) {
-                walletStatusSpan.textContent = `Connected: ${formatAddress(
-                    userAddress
-                )} (${
-                    selectedProviderDetail?.info?.name || "Wallet"
-                }) on ${BASE_SEPOLIA_CHAIN_NAME}`;
-            }
+        const wasInitialLoad = isInitialLoad; // Capture the state for this specific call
 
+        if (wasInitialLoad) {
+            showLoadingMessage(); // Clears commentsContainer and shows "Loading comments..."
+        } else {
+            // For background refresh, provide a subtle loading indicator
+            if (refreshButton) {
+                refreshButton.textContent = "Refreshing...";
+                refreshButton.disabled = true;
+            }
+            // Do NOT call the global showLoadingMessage() here for background refreshes.
+            // displayFilteredComments will handle clearing and re-rendering the comment list.
+        }
+
+        // Update connect button state (this part remains the same)
+        if (connectWalletButton) {
+            if (userAddress) {
+                if (isOnCorrectNetwork) {
+                    connectWalletButton.textContent = `${formatAddress(userAddress)}`;
+                    connectWalletButton.disabled = true;
+                } else {
+                    connectWalletButton.textContent = `${formatAddress(userAddress)}`;
+                    connectWalletButton.disabled = false;
+                }
+            }
+        }
+
+        try {
             const fetchedComments = await fetchComments();
-            allFetchedComments = fetchedComments || [];
+            const rawFetchedComments = fetchedComments || [];
+
+            const { contentComments, likeCounts } = processCommentsAndLikes(rawFetchedComments);
+            window.currentLikeCounts = likeCounts;
+            allFetchedComments = contentComments; // This now holds only displayable comments
 
             if (allFetchedComments.length === 0) {
-                showNoCommentsMessage();
-                renderChannelMenu(); // Still render menu for consistency
-                return;
+                // No content comments to display after processing.
+                // Determine the appropriate message.
+                const message = rawFetchedComments.length > 0 ?
+                    "No displayable comments found (all items might be reactions or other types)." :
+                    "No comments found.";
+                showNoCommentsMessage(message); // This function clears commentsContainer.
+                renderChannelMenu(); // Always render the menu.
+                if (wasInitialLoad) {
+                    isInitialLoad = false; // Mark initial load as done.
+                }
+                // Finalize button state for background refresh if it was one
+                if (!wasInitialLoad && refreshButton) {
+                    refreshButton.textContent = "Refresh Comments";
+                    refreshButton.disabled = false;
+                }
+                return; // Exit early as there's nothing to display via displayFilteredComments.
             }
-            // If a filter is already set (e.g. user connected wallet and view refreshed), maintain it.
-            // Otherwise, default to null (all comments).
+
+            // If we have content comments, displayFilteredComments will handle rendering.
+            // displayFilteredComments clears commentsContainer and then renders or shows "no comments for filter".
             displayFilteredComments(currentChannelFilter);
+
+            if (wasInitialLoad) {
+                isInitialLoad = false; // Mark initial load as done after successful display.
+            }
+
         } catch (error) {
-            allFetchedComments = []; // Clear any potentially stale data
-            showErrorMessage(`Failed to load comments: ${error.message}`);
-            renderChannelMenu(); // Render menu even on error
+            allFetchedComments = []; // Reset on error
+            window.currentLikeCounts.clear();
+
+            if (wasInitialLoad) {
+                showErrorMessage(`Failed to load comments: ${error.message}`);
+            } else {
+                // For background refresh errors, log and optionally show a non-intrusive message.
+                console.error("Background refresh failed:", error);
+                if (postStatusMessage) showPostStatus(`Refresh failed: ${error.message}`, true, postStatusMessage);
+                // Do not clear existing comments on background refresh failure.
+            }
+            renderChannelMenu(); // Still attempt to render menu.
+        } finally {
+            // Re-enable refresh button if it was a background refresh.
+            if (!wasInitialLoad && refreshButton) {
+                refreshButton.textContent = "Refresh Comments";
+                refreshButton.disabled = false;
+            }
+            // If it was an initial load, the refresh button wasn't in a "Refreshing..." state.
         }
     }
+
 
     if (refreshButton) {
         refreshButton.addEventListener("click", initializeCommentsView);
     }
-
     if (logoElement) {
-        logoElement.addEventListener("click", () => {
-            handleChannelClick(null);
-        });
+        logoElement.addEventListener("click", () => handleChannelClick(null));
     } else {
         console.warn("Logo element with ID 'logo' not found.");
     }
 
-    // Event Listeners for New Buttons
     if (connectWalletButton) {
         connectWalletButton.addEventListener("click", connectWallet);
     }
-
     if (submitNewCommentButton) {
         submitNewCommentButton.addEventListener("click", () => {
             const content = newCommentContent.value;
-            const channelId = newCommentChannelId.value; // Will be parsed in submitEcpComment
+            const channelId = newCommentChannelId.value;
             submitNewCommentButton.disabled = true;
-            showPostStatus("Posting new comment...", false, postStatusMessage); // Use the main status element
-            submitEcpComment(content, channelId, null, postStatusMessage) // parentId is null for new comments
+            showPostStatus("Posting new comment...", false, postStatusMessage);
+            submitEcpComment(content, channelId, null, postStatusMessage) // commentType 0 by default
                 .catch(() => {
-                    /* Error already handled by showPostStatus in submitEcpComment */
+                    /* Error handled */
                 })
                 .finally(() => {
-                    submitNewCommentButton.disabled = false; // Re-enable button
+                    submitNewCommentButton.disabled = false;
                 });
         });
     }
 
-    // Initial load
     initializeCommentsView();
 });
