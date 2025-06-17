@@ -1,35 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECP Comment Viewer</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="https://docs.ethcomments.xyz/logo-ecp-light.svg" type="image/svg+xml">
-</head>
-<body>
-    <header>
-        <img src="https://docs.ethcomments.xyz/logo-ecp-light.svg" alt="ECP Logo" id="logo">
-        <h1>Ethereum Comments Protocol Viewer</h1>
-    </header>
-    <main>
-        <div id="channel-menu">
-            <!-- Channel buttons will be dynamically added here by JavaScript -->
-        </div>
-        <div id="main-content">
-            <div class="controls">
-                <button id="burger-menu-button" aria-label="Toggle channel menu" aria-expanded="false">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <button id="refresh-button">Refresh Comments</button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ECP Comment Viewer</title>
+        <!-- Add Ethers.js -->
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.1/ethers.umd.min.js"
+            integrity="sha512-nhTUaJWcf19KPfEAol6WNtSUx/DKaGE1jc9hL6kMBVMigUtu4whc+cA65oq5vZALC7HlgxzW1w2/cV+GIH6T+A=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
+        <link rel="stylesheet" href="style.css" />
+        <link
+            rel="icon"
+            href="https://docs.ethcomments.xyz/logo-ecp-light.svg"
+            type="image/svg+xml"
+        />
+    </head>
+    <body>
+        <header>
+            <img
+                src="https://docs.ethcomments.xyz/logo-ecp-light.svg"
+                alt="ECP Logo"
+                id="logo"
+            />
+            <h1>Ethereum Comments Protocol Viewer</h1>
+            <button id="connect-wallet-button">Connect Wallet</button>
+            <span id="wallet-status">Not Connected</span>
+        </header>
+        <main>
+            <div id="channel-menu">
+                <!-- Channel buttons will be dynamically added here by JavaScript -->
             </div>
-            <div id="comments-container">
-                <p class="loading-message">Loading comments...</p>
+            <div id="main-content">
+                <div id="new-comment-area" style="display: none">
+                    <!-- Initially hidden -->
+                    <h3>Post a New Comment</h3>
+                    <textarea
+                        id="new-comment-content"
+                        placeholder="Write your comment..."
+                        rows="3"
+                    ></textarea>
+                    <input
+                        type="text"
+                        id="new-comment-channel-id"
+                        placeholder="Channel ID (optional, defaults to 0)"
+                    />
+                    <button id="submit-new-comment-button">Post Comment</button>
+                    <p id="post-status-message" class="status-message"></p>
+                </div>
+                <div class="controls">
+                    <button
+                        id="burger-menu-button"
+                        aria-label="Toggle channel menu"
+                        aria-expanded="false"
+                    >
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <button id="refresh-button">Refresh Comments</button>
+                </div>
+                <div id="comments-container">
+                    <p class="loading-message">Loading comments...</p>
+                </div>
             </div>
-        </div>
-    </main>
-    <script src="app.js"></script>
-</body>
+        </main>
+        <script src="app.js"></script>
+    </body>
 </html>

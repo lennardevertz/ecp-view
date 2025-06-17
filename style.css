@@ -244,7 +244,6 @@ a:hover {
     padding: 10px; /* Padding provides clickable area */
     cursor: pointer;
     z-index: 1001; /* Ensure it's above other elements if menu overlays */
-    /* margin-right: 10px; /* Removed or adjust if needed for new context */
 }
 
 #burger-menu-button span {
@@ -267,6 +266,157 @@ a:hover {
     transform: translateY(-7px) rotate(-45deg);
 }
 
+/* Wallet and New Comment Form Styles */
+#connect-wallet-button {
+    margin-left: auto; /* Pushes to the right in header flex */
+    padding: 8px 12px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+#connect-wallet-button:disabled {
+    background-color: #95a5a6;
+    cursor: default;
+}
+#wallet-status {
+    margin-left: 10px;
+    font-size: 0.9em;
+    color: #ecf0f1; /* Match header text color */
+}
+
+#new-comment-area {
+    background-color: #fdfdfd; /* Slightly off-white */
+    padding: 20px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+#new-comment-area h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: #2c3e50;
+}
+#new-comment-area textarea,
+#new-comment-area input[type="text"] {
+    width: calc(100% - 22px); /* Account for padding/border */
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1em;
+    box-sizing: border-box;
+}
+#new-comment-area button {
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.2s ease;
+}
+#new-comment-area button:hover {
+    background-color: #27ae60;
+}
+#new-comment-area button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+.status-message { /* General class for status messages */
+    margin-top: 10px;
+    font-size: 0.9em;
+    padding: 8px;
+    border-radius: 4px;
+    display: none; /* Hidden by default, shown by JS */
+}
+/* Specific styling for status messages if needed, JS sets color directly for now */
+/*
+#post-status-message.error, .reply-status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+#post-status-message.success, .reply-status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+*/
+
+
+/* Reply Button and Form Styles */
+.reply-button-container {
+    margin-top: 10px;
+}
+.reply-button, .reply-form button {
+    font-size: 0.85em;
+    padding: 5px 10px;
+    margin-right: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.reply-button {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    color: #343a40;
+}
+.reply-button:hover {
+    background-color: #dee2e6;
+}
+.reply-form {
+    margin-top: 8px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+}
+.reply-form textarea {
+    width: calc(100% - 12px); /* Adjust for padding */
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.95em;
+    box-sizing: border-box;
+    min-height: 50px;
+}
+.reply-form .submit-reply-button {
+    background-color: #3498db;
+    color: white;
+    border: 1px solid #2980b9;
+}
+.reply-form .submit-reply-button:hover {
+    background-color: #2980b9;
+}
+.reply-form .submit-reply-button:disabled,
+.reply-form .cancel-reply-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    border-color: #7f8c8d;
+}
+.reply-form .cancel-reply-button {
+    background-color: #ecf0f1;
+    color: #34495e;
+    border: 1px solid #bdc3c7;
+}
+.reply-form .cancel-reply-button:hover {
+    background-color: #dadedf;
+}
+.reply-status-message { /* Already styled by .status-message, JS handles color */
+    font-size: 0.85em !important; 
+    margin-top: 8px !important;
+    padding: 5px !important; /* Smaller padding for reply status */
+}
+
+
 /* Media Query for Mobile View */
 @media (max-width: 768px) {
     header {
@@ -282,31 +432,28 @@ a:hover {
         position: fixed;
         top: 15px;   /* Adjust for desired padding from the top edge of the viewport/menu */
         left: 15px;  /* Adjust for desired padding from the left edge of the viewport/menu */
-        /* z-index is already 1001, which is correct to keep it above the menu panel (z-index: 1000) */
     }
 
     main {
-        flex-direction: column; /* Stack menu and content vertically if menu is part of flow */
-                               /* This might not be strictly necessary if menu is fixed and overlays */
+        flex-direction: column; 
     }
 
     #channel-menu {
         position: fixed; 
         left: 0;
-        top: 0; /* Start from the very top */
+        top: 0; 
         width: 250px; 
-        height: 100vh; /* Full height */
+        height: 100vh; 
         background-color: #f8f9fa;
-        z-index: 1000; /* Above other content */
-        transform: translateX(-100%); /* Initially off-screen */
+        z-index: 1000; 
+        transform: translateX(-100%); 
         transition: transform 0.3s ease-in-out;
         box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        /* Adjusted padding for consistent spacing and to accommodate the fixed 'X' button */
-        padding: 60px 15px 15px 15px; /* Top, Right, Bottom, Left */
-        overflow-y: auto; /* Ensure menu content is scrollable if it exceeds height */
-        max-height: 100vh; /* Ensure it doesn't exceed viewport height */
-        border-right: 1px solid #ccc; /* Add a border to distinguish from content */
-        box-sizing: border-box; /* Ensures padding and border don't increase the specified width/height */
+        padding: 60px 15px 15px 15px; 
+        overflow-y: auto; 
+        max-height: 100vh; 
+        border-right: 1px solid #ccc; 
+        box-sizing: border-box; 
     }
 
     #channel-menu.open {
@@ -314,11 +461,10 @@ a:hover {
     }
 
     #main-content {
-        width: 100%; /* Ensure main content takes full width when menu is an overlay */
-        margin-left: 0; /* Reset margin if it was affected by flexbox gap on desktop */
+        width: 100%; 
+        margin-left: 0; 
     }
 
-    /* Optional: Add an overlay for the rest of the page when menu is open */
     body.menu-open-overlay::after {
         content: "";
         position: fixed;
@@ -327,6 +473,6 @@ a:hover {
         width: 100%;
         height: 100%;
         background-color: rgba(0, 0, 0, 0.5);
-        z-index: 999; /* Below menu, above content */
+        z-index: 999; 
     }
 }
