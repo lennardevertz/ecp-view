@@ -2,7 +2,7 @@ let allFetchedComments = [];
 let currentChannelFilter = null; // null for 'All Comments', 0 for 'No Channel', channelId for specific channel
 
 // Add these:
-const COMMENT_MANAGER_ADDRESS = "0x519D00E2C60BD598a8c234785216A3037b09F0CF";
+const COMMENT_MANAGER_ADDRESS = "0x2422fab84142e5930c8A44adaFD4Df8A53193986";
 const ICommentManagerABI = [
     {
         type: "function",
@@ -981,10 +981,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (connectWalletButton) {
             if (userAddress) {
                 if (isOnCorrectNetwork) {
-                    connectWalletButton.textContent = `${formatAddress(userAddress)}`;
+                    connectWalletButton.textContent = `${formatAddress(
+                        userAddress
+                    )}`;
                     connectWalletButton.disabled = true;
                 } else {
-                    connectWalletButton.textContent = `${formatAddress(userAddress)}`;
+                    connectWalletButton.textContent = `${formatAddress(
+                        userAddress
+                    )}`;
                     connectWalletButton.disabled = false;
                 }
             }
@@ -994,16 +998,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const fetchedComments = await fetchComments();
             const rawFetchedComments = fetchedComments || [];
 
-            const { contentComments, likeCounts } = processCommentsAndLikes(rawFetchedComments);
+            const {contentComments, likeCounts} =
+                processCommentsAndLikes(rawFetchedComments);
             window.currentLikeCounts = likeCounts;
             allFetchedComments = contentComments; // This now holds only displayable comments
 
             if (allFetchedComments.length === 0) {
                 // No content comments to display after processing.
                 // Determine the appropriate message.
-                const message = rawFetchedComments.length > 0 ?
-                    "No displayable comments found (all items might be reactions or other types)." :
-                    "No comments found.";
+                const message =
+                    rawFetchedComments.length > 0
+                        ? "No displayable comments found (all items might be reactions or other types)."
+                        : "No comments found.";
                 showNoCommentsMessage(message); // This function clears commentsContainer.
                 renderChannelMenu(); // Always render the menu.
                 if (wasInitialLoad) {
@@ -1024,7 +1030,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (wasInitialLoad) {
                 isInitialLoad = false; // Mark initial load as done after successful display.
             }
-
         } catch (error) {
             allFetchedComments = []; // Reset on error
             window.currentLikeCounts.clear();
@@ -1034,7 +1039,12 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 // For background refresh errors, log and optionally show a non-intrusive message.
                 console.error("Background refresh failed:", error);
-                if (postStatusMessage) showPostStatus(`Refresh failed: ${error.message}`, true, postStatusMessage);
+                if (postStatusMessage)
+                    showPostStatus(
+                        `Refresh failed: ${error.message}`,
+                        true,
+                        postStatusMessage
+                    );
                 // Do not clear existing comments on background refresh failure.
             }
             renderChannelMenu(); // Still attempt to render menu.
@@ -1047,7 +1057,6 @@ document.addEventListener("DOMContentLoaded", () => {
             // If it was an initial load, the refresh button wasn't in a "Refreshing..." state.
         }
     }
-
 
     if (refreshButton) {
         refreshButton.addEventListener("click", initializeCommentsView);
