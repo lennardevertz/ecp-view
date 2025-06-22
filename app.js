@@ -2,7 +2,7 @@ let allFetchedComments = [];
 let currentChannelFilter = null; // null for 'All Comments', 0 for 'No Channel', channelId for specific channel
 
 // Add these:
-const COMMENT_MANAGER_ADDRESS = "0x2422fab84142e5930c8A44adaFD4Df8A53193986";
+const COMMENT_MANAGER_ADDRESS = "0x5AA15C66D84E8BCbC4FDB696D647Db5f7D30b7D8";
 const ICommentManagerABI = [
     {
         type: "function",
