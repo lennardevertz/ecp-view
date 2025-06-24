@@ -2,7 +2,7 @@ let allFetchedComments = [];
 let currentChannelFilter = null; // null for 'All Comments', 0 for 'No Channel', channelId for specific channel
 
 // Add these:
-const COMMENT_MANAGER_ADDRESS = "0x5AA15C66D84E8BCbC4FDB696D647Db5f7D30b7D8";
+const COMMENT_MANAGER_ADDRESS = "0xb262C9278fBcac384Ef59Fc49E24d800152E19b1";
 const ICommentManagerABI = [
     {
         type: "function",
@@ -62,11 +62,17 @@ const ICommentManagerABI = [
 ];
 
 // Add these:
-const TARGET_CHAIN_ID = 84532;
-const TARGET_CHAIN_ID_HEX = "0x14A34"; // Hex representation of 84532
-const BASE_SEPOLIA_RPC_URL = "https://sepolia.base.org";
-const BASE_SEPOLIA_EXPLORER_URL = "https://sepolia-explorer.base.org";
-const BASE_SEPOLIA_CHAIN_NAME = "Base Sepolia Testnet";
+// const TARGET_CHAIN_ID = 84532;
+// const TARGET_CHAIN_ID_HEX = "0x14A34"; // Hex representation of 84532
+// const BASE_SEPOLIA_RPC_URL = "https://sepolia.base.org";
+// const BASE_SEPOLIA_EXPLORER_URL = "https://sepolia-explorer.base.org";
+// const BASE_SEPOLIA_CHAIN_NAME = "Base Sepolia Testnet";
+
+const TARGET_CHAIN_ID = 8453;
+const TARGET_CHAIN_ID_HEX = "0x2105"; // Hex representation of 8453
+const BASE_SEPOLIA_RPC_URL = "https://base.llamarpc.com";
+const BASE_SEPOLIA_EXPLORER_URL = "https://basescan.org";
+const BASE_SEPOLIA_CHAIN_NAME = "Base Mainnet";
 
 // Add these for reactions:
 const COMMENT_TYPE_REACTION = 1;
