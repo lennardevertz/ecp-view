@@ -59,10 +59,32 @@
             <div id="main-content">
                 <div id="profile-view-header" class="hidden">
                     <div id="profile-view-avatar" class="author-avatar"></div>
-                    <h2 id="profile-view-name"></h2>
-                    <button id="back-to-comments-button">
-                        ← Back to All Comments
-                    </button>
+                    <div class="profile-view-details">
+                        <h2 id="profile-view-name"></h2>
+                        <div id="profile-view-stats" class="hidden">
+                            <span id="profile-followers"></span>
+                            <span id="profile-following"></span>
+                            <span id="profile-follow-state" class="hidden"></span>
+                        </div>
+                        <p id="profile-view-description" class="hidden"></p>
+                        <div id="profile-view-socials" class="hidden"></div>
+                    </div>
+                    <div class="profile-view-actions">
+                        <button id="follow-button" class="hidden"></button>
+                        <button id="back-to-comments-button" title="Back to All Comments">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="profile-view-tabs" class="hidden">
+                    <button id="profile-comments-tab" class="profile-tab">Comments</button>
+                    <button id="profile-mentions-tab" class="profile-tab">Mentions</button>
+                </div>
+                <div id="common-followers-section" class="hidden">
+                    <h3>Common Followers</h3>
+                    <div id="common-followers-list"></div>
                 </div>
                 <div id="new-comment-area" style="display: none">
                     <!-- Initially hidden -->
@@ -94,6 +116,7 @@
                 <div id="comments-container">
                     <p class="loading-message">Loading comments...</p>
                 </div>
+                <div id="mentions-container" class="hidden"></div>
             </div>
         </main>
         <script src="app.js"></script>

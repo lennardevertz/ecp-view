@@ -357,7 +357,7 @@ a:hover {
 /* Profile View Header Styles */
 #profile-view-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     padding: 15px;
     margin-bottom: 20px;
     background-color: #fdfdfd;
@@ -371,6 +371,35 @@ a:hover {
     margin-right: 15px;
 }
 
+.profile-view-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#profile-view-stats {
+    display: flex;
+    gap: 15px;
+    margin-top: 5px;
+}
+
+#profile-view-stats span {
+    font-size: 0.95em;
+    color: #555;
+}
+
+#profile-follow-state {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #27ae60; /* Green for positive state */
+    background-color: #eafaf1;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid #a3e9c3;
+    margin-left: 5px; /* Space from other stats */
+    align-self: center; /* Vertically align with other stats */
+}
+
 #profile-view-header h2 {
     margin: 0;
     font-size: 1.8em;
@@ -378,20 +407,154 @@ a:hover {
     font-weight: 600;
 }
 
-#back-to-comments-button {
+/* --- Add the following styles --- */
+.mention-link {
+    color: #3498db; /* Use a theme color */
+    font-weight: 500;
+    cursor: pointer;
+}
+.mention-link:hover {
+    text-decoration: underline;
+}
+
+#profile-view-tabs {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+}
+
+.profile-tab {
+    padding: 10px 15px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size: 1em;
+    color: #555;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px; /* Align with the container's border */
+    transition: color 0.2s, border-bottom-color 0.2s;
+}
+
+.profile-tab:hover {
+    color: #2c3e50;
+}
+
+.profile-tab.active {
+    border-bottom-color: #3498db;
+    color: #2c3e50;
+    font-weight: 600;
+}
+/* --- End of new styles --- */
+
+#profile-view-description {
+    font-size: 0.95em;
+    color: #555;
+    margin-top: 8px;
+    max-width: 600px;
+}
+
+#profile-view-socials {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+#profile-view-socials a {
+    color: #7f8c8d;
+    transition: color 0.2s ease;
+}
+
+#profile-view-socials a:hover {
+    color: #2c3e50;
+}
+
+#profile-view-socials svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+}
+
+.profile-view-actions {
     margin-left: auto;
-    background-color: #e9ecef;
-    color: #343a40;
-    border: 1px solid #ced4da;
-    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+#follow-button {
+    background-color: #3498db;
+    color: white;
+    border: 1px solid #2980b9;
+    padding: 8px 16px;
     font-size: 0.9em;
+    font-weight: 600;
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
 
+#follow-button:hover {
+    background-color: #2980b9;
+}
+
+#back-to-comments-button {
+    background-color: transparent;
+    color: #6c757d;
+    border: none;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 #back-to-comments-button:hover {
-    background-color: #dee2e6;
+    background-color: #e9ecef;
+}
+
+#back-to-comments-button svg {
+    width: 20px;
+    height: 20px;
+}
+
+#common-followers-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #fdfdfd;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+#common-followers-section h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+#common-followers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.common-follower-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+}
+
+.common-follower-item .author-avatar {
+    width: 28px;
+    height: 28px;
 }
 
 /* Profile Section Styles */

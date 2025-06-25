@@ -88,6 +88,10 @@ let ensCache = new Map();
 let pendingEnsLookups = new Map();
 let avatarCache = new Map();
 let pendingAvatarLookups = new Map();
+let followerStatsCache = new Map();
+let ensDetailsCache = new Map();
+let followStateCache = new Map();
+let commonFollowersCache = new Map();
 let currentProfileFilter = null; // Add this for the new view
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -107,6 +111,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const backToCommentsButton = document.getElementById(
         "back-to-comments-button"
     );
+    const profileViewStats = document.getElementById("profile-view-stats");
+    const profileFollowers = document.getElementById("profile-followers");
+    const profileFollowing = document.getElementById("profile-following");
+    const profileFollowState = document.getElementById("profile-follow-state");
+    const profileViewDescription = document.getElementById(
+        "profile-view-description"
+    );
+    const profileViewSocials = document.getElementById("profile-view-socials");
+    const followButton = document.getElementById("follow-button");
+    const commonFollowersSection = document.getElementById(
+        "common-followers-section"
+    );
+    const commonFollowersList = document.getElementById(
+        "common-followers-list"
+    );
+
+    // Add these:
+    const profileViewTabs = document.getElementById("profile-view-tabs");
+    const profileCommentsTab = document.getElementById("profile-comments-tab");
+    const profileMentionsTab = document.getElementById("profile-mentions-tab");
+    const mentionsContainer = document.getElementById("mentions-container");
 
     // New DOM Elements
     const connectWalletButton = document.getElementById(
@@ -358,7 +383,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 signer
             );
 
-            if (connectWalletButton) connectWalletButton.classList.add("hidden");
+            if (connectWalletButton)
+                connectWalletButton.classList.add("hidden");
             if (userProfileDiv) {
                 userProfileDiv.classList.remove("hidden");
                 profileNameSpan.textContent = formatAddress(
@@ -538,10 +564,250 @@ document.addEventListener("DOMContentLoaded", () => {
         initializeCommentsView();
     }
 
+    function updateFollowerStatsUI(stats) {
+        if (
+            stats &&
+            stats.followers_count !== undefined &&
+            stats.following_count !== undefined
+        ) {
+            profileFollowers.textContent = `${stats.followers_count} Followers`;
+            profileFollowing.textContent = `${stats.following_count} Following`;
+            profileViewStats.classList.remove("hidden");
+        } else {
+            profileViewStats.classList.add("hidden");
+        }
+    }
+
+    async function fetchAndDisplayFollowerStats(address) {
+        // Reset UI for new profile
+        updateFollowerStatsUI(null);
+
+        if (followerStatsCache.has(address)) {
+            const stats = followerStatsCache.get(address);
+            updateFollowerStatsUI(stats);
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://api.ethfollow.xyz/api/v1/users/${address}/stats`
+            );
+            if (!response.ok) {
+                // This can happen if the user is not in the protocol (404), which is fine.
+                throw new Error(`API returned status ${response.status}`);
+            }
+            const stats = await response.json();
+            followerStatsCache.set(address, stats);
+            updateFollowerStatsUI(stats);
+        } catch (error) {
+            console.warn(
+                `Could not fetch follower stats for ${address}:`,
+                error.message
+            );
+            followerStatsCache.set(address, null); // Cache failure to prevent retries
+            updateFollowerStatsUI(null);
+        }
+    }
+
+    // --- START: New functions for enhanced profile data ---
+
+    function updateEnsDetailsUI(data) {
+        const description = data?.ens?.records?.description;
+        if (description) {
+            profileViewDescription.textContent = description;
+            profileViewDescription.classList.remove("hidden");
+        } else {
+            profileViewDescription.classList.add("hidden");
+        }
+
+        const socials = {
+            twitter: data?.ens?.records?.["com.twitter"],
+            github: data?.ens?.records?.["com.github"],
+            discord: data?.ens?.records?.["com.discord"],
+        };
+
+        const socialIcons = {
+            twitter: `<svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+            github: `<svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.72c0 .27.18.58.69.48A10 10 0 0 0 22 12 10 10 0 0 0 12 2Z"/></svg>`,
+            discord: `<svg viewBox="0 0 24 24"><path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.443.805-.61 1.249a18.58 18.58 0 0 0-5.488 0 18.18 18.18 0 0 0-.61-1.249.074.074 0 0 0-.078-.037A19.791 19.791 0 0 0 3.683 4.37a.07.07 0 0 0-.034.044c-1.429 5.2-1.107 9.6.324 13.024a.074.074 0 0 0 .043.058 21.47 21.47 0 0 0 5.223 2.433.074.074 0 0 0 .086-.023c.33-.24.63-.516.89-.814a.074.074 0 0 0-.02-.11c-1.21-.88-2.22-2.04-2.87-3.446a.074.074 0 0 1 .004-.08c.48-.39.93-.82 1.33-1.284a.074.074 0 0 1 .08-.01c3.47 1.57 7.15 1.57 10.64 0a.074.074 0 0 1 .08.01c.4.46.85.89 1.33 1.284a.074.074 0 0 1 .004.08c-.65 1.4-1.66 2.56-2.87 3.446a.074.074 0 0 0-.02.11c.26.3.56.57.89.814a.074.074 0 0 0 .086.023 21.47 21.47 0 0 0 5.223-2.433.074.074 0 0 0 .043-.058c1.43-3.42.75-7.82-.32-13.02a.07.07 0 0 0-.03-.045zM8.02 15.33c-1.18 0-2.15-1.08-2.15-2.42s.97-2.42 2.15-2.42c1.19 0 2.15 1.08 2.15 2.42s-.96 2.42-2.15 2.42zm7.96 0c-1.18 0-2.15-1.08-2.15-2.42s.97-2.42 2.15-2.42c1.19 0 2.15 1.08 2.15 2.42s-.96 2.42-2.15 2.42z"/></svg>`,
+        };
+
+        profileViewSocials.innerHTML = "";
+        let hasSocials = false;
+        for (const [key, value] of Object.entries(socials)) {
+            if (value) {
+                hasSocials = true;
+                const link = document.createElement("a");
+                link.href =
+                    key === "twitter"
+                        ? `https://twitter.com/${value}`
+                        : key === "github"
+                        ? `https://github.com/${value}`
+                        : "#"; // Discord has no standard link format
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.title = `${key}: ${value}`;
+                link.innerHTML = socialIcons[key];
+                profileViewSocials.appendChild(link);
+            }
+        }
+        profileViewSocials.classList.toggle("hidden", !hasSocials);
+    }
+
+    async function fetchAndDisplayEnsDetails(address) {
+        if (ensDetailsCache.has(address)) {
+            updateEnsDetailsUI(ensDetailsCache.get(address));
+            return;
+        }
+        try {
+            const response = await fetch(
+                `https://api.ethfollow.xyz/api/v1/users/${address}/ens`
+            );
+            if (!response.ok) throw new Error(`API error ${response.status}`);
+            const data = await response.json();
+            ensDetailsCache.set(address, data);
+            updateEnsDetailsUI(data);
+        } catch (error) {
+            console.warn(`Could not fetch ENS details for ${address}:`, error);
+            ensDetailsCache.set(address, null);
+            updateEnsDetailsUI(null);
+        }
+    }
+
+    function updateFollowStateUI(state) {
+        if (state) {
+            if (state.follow) {
+                // Show the subtle "Following" text indicator
+                profileFollowState.textContent = "Following";
+                profileFollowState.classList.remove("hidden");
+                // Hide the action button completely
+                followButton.classList.add("hidden");
+            } else {
+                // // Show the "Follow" action button
+                // followButton.textContent = "Follow";
+                // followButton.disabled = false;
+                // followButton.classList.remove("hidden");
+                // Hide the subtle text indicator
+                profileFollowState.classList.add("hidden");
+            }
+        } else {
+            // No state available, hide both elements
+            followButton.classList.add("hidden");
+            profileFollowState.classList.add("hidden");
+        }
+    }
+
+    async function fetchAndDisplayFollowState(profileAddress, viewerAddress) {
+        if (!viewerAddress) {
+            updateFollowStateUI(null);
+            return;
+        }
+        const cacheKey = `${profileAddress}-${viewerAddress}`;
+        if (followStateCache.has(cacheKey)) {
+            updateFollowStateUI(followStateCache.get(cacheKey));
+            return;
+        }
+        try {
+            const response = await fetch(
+                `https://api.ethfollow.xyz/api/v1/users/${profileAddress}/${viewerAddress}/followerState`
+            );
+            if (!response.ok) throw new Error(`API error ${response.status}`);
+            const data = await response.json();
+            followStateCache.set(cacheKey, data.state);
+            updateFollowStateUI(data.state);
+        } catch (error) {
+            console.warn(`Could not fetch follow state:`, error);
+            followStateCache.set(cacheKey, null);
+            updateFollowStateUI(null);
+        }
+    }
+
+    function updateCommonFollowersUI(data) {
+        commonFollowersList.innerHTML = "";
+        if (data && data.results && data.results.length > 0) {
+            data.results.slice(0, 10).forEach((follower) => {
+                // Limit to 10 for now
+                const item = document.createElement("div");
+                item.classList.add("common-follower-item");
+                item.innerHTML = `
+                    <div class="author-avatar"></div>
+                    <span>${
+                        follower.name || formatAddress(follower.address)
+                    }</span>
+                `;
+                const avatar = item.querySelector(".author-avatar");
+                if (follower.avatar) {
+                    avatar.style.backgroundImage = `url('${follower.avatar}')`;
+                }
+                commonFollowersList.appendChild(item);
+            });
+            commonFollowersSection.classList.remove("hidden");
+        } else {
+            commonFollowersSection.classList.add("hidden");
+        }
+    }
+
+    async function fetchAndDisplayCommonFollowers(
+        profileAddress,
+        viewerAddress
+    ) {
+        if (!viewerAddress) {
+            updateCommonFollowersUI(null);
+            return;
+        }
+        const cacheKey = `${profileAddress}-${viewerAddress}`;
+        if (commonFollowersCache.has(cacheKey)) {
+            updateCommonFollowersUI(commonFollowersCache.get(cacheKey));
+            return;
+        }
+        try {
+            const response = await fetch(
+                `https://api.ethfollow.xyz/api/v1/users/${profileAddress}/commonFollowers?leader=${viewerAddress}`
+            );
+            if (!response.ok) throw new Error(`API error ${response.status}`);
+            const data = await response.json();
+            commonFollowersCache.set(cacheKey, data);
+            updateCommonFollowersUI(data);
+        } catch (error) {
+            console.warn(`Could not fetch common followers:`, error);
+            commonFollowersCache.set(cacheKey, null);
+            updateCommonFollowersUI(null);
+        }
+    }
+
+    // --- Add this new function ---
+    function displayProfileMentions() {
+        if (!currentProfileFilter) return;
+
+        if (commentsContainer) commentsContainer.classList.add("hidden");
+        if (mentionsContainer) mentionsContainer.classList.remove("hidden");
+
+        const mentions = allFetchedComments.filter((c) =>
+            c.content
+                .toLowerCase()
+                .includes(`@${currentProfileFilter.toLowerCase()}`)
+        );
+
+        mentionsContainer.innerHTML = ""; // Clear previous content
+
+        if (mentions.length > 0) {
+            const sortedMentions = mentions.sort(sortByDate);
+            const commentTree = buildCommentTree(sortedMentions);
+            commentTree.forEach((comment) => {
+                mentionsContainer.appendChild(renderComment(comment));
+            });
+        } else {
+            mentionsContainer.innerHTML = `<p class="no-comments-message">No mentions found for this user.</p>`;
+        }
+    }
+
+    // --- END: New functions for enhanced profile data ---
+
     function updateNewCommentAreaVisibility() {
         if (!newCommentArea) return;
 
-        const isConnectedAndOnCorrectNetwork = userAddress && isOnCorrectNetwork;
+        const isConnectedAndOnCorrectNetwork =
+            userAddress && isOnCorrectNetwork;
 
         // Context is postable if we are NOT in a profile view,
         // OR if we are viewing our OWN profile.
@@ -549,7 +815,8 @@ document.addEventListener("DOMContentLoaded", () => {
             !currentProfileFilter ||
             (currentProfileFilter &&
                 userAddress &&
-                currentProfileFilter.toLowerCase() === userAddress.toLowerCase());
+                currentProfileFilter.toLowerCase() ===
+                    userAddress.toLowerCase());
 
         if (isConnectedAndOnCorrectNetwork && isPostableContext) {
             newCommentArea.style.display = "block";
@@ -569,7 +836,45 @@ document.addEventListener("DOMContentLoaded", () => {
                 profileViewName
             );
             resolveAndApplyAvatar(authorAddress, profileViewAvatar);
+
+            // --- Add this block ---
+            // Show and setup profile tabs
+            if (profileViewTabs) {
+                profileViewTabs.classList.remove("hidden");
+                profileCommentsTab.classList.add("active");
+                profileMentionsTab.classList.remove("active");
+
+                profileCommentsTab.onclick = () => {
+                    profileCommentsTab.classList.add("active");
+                    profileMentionsTab.classList.remove("active");
+                    displayFilteredComments(); // Re-display user's own comments
+                };
+
+                profileMentionsTab.onclick = () => {
+                    profileMentionsTab.classList.add("active");
+                    profileCommentsTab.classList.remove("active");
+                    displayProfileMentions();
+                };
+            }
+            if (mentionsContainer) mentionsContainer.classList.add("hidden");
+            // --- End of added block ---
+
             profileViewHeader.classList.remove("hidden");
+
+            // Fetch all profile data in parallel
+            fetchAndDisplayFollowerStats(authorAddress);
+            fetchAndDisplayEnsDetails(authorAddress);
+            if (
+                userAddress &&
+                userAddress.toLowerCase() !== authorAddress.toLowerCase()
+            ) {
+                fetchAndDisplayFollowState(authorAddress, userAddress);
+                fetchAndDisplayCommonFollowers(authorAddress, userAddress);
+            } else {
+                // Hide elements that are only relevant when viewing another profile
+                followButton.classList.add("hidden");
+                commonFollowersSection.classList.add("hidden");
+            }
         }
 
         // Re-render comments for the selected author
@@ -582,6 +887,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (profileViewHeader) {
             profileViewHeader.classList.add("hidden");
         }
+        // Add these lines:
+        if (profileViewTabs) profileViewTabs.classList.add("hidden");
+        if (mentionsContainer) mentionsContainer.classList.add("hidden");
+
+        // Also hide extended profile sections
+        if (profileViewDescription)
+            profileViewDescription.classList.add("hidden");
+        if (profileViewSocials) profileViewSocials.classList.add("hidden");
+        if (followButton) followButton.classList.add("hidden");
+        if (profileFollowState) profileFollowState.classList.add("hidden");
+        if (commonFollowersSection)
+            commonFollowersSection.classList.add("hidden");
+
         // Re-render comments based on the last active channel filter
         displayFilteredComments(currentChannelFilter);
         updateNewCommentAreaVisibility();
@@ -644,6 +962,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    const sortByDate = (a, b) =>
+        parseInt(b.createdAt) - parseInt(a.createdAt);
+
     function buildCommentTree(comments) {
         const commentMap = new Map();
         comments.forEach((comment) => {
@@ -661,8 +982,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        const sortByDate = (a, b) =>
-            parseInt(b.createdAt) - parseInt(a.createdAt);
         tree.sort(sortByDate);
         comments.forEach((comment) => {
             if (comment.children.length > 0) {
@@ -867,7 +1186,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const contentP = document.createElement("p");
         contentP.classList.add("comment-content");
-        contentP.textContent = comment.content;
+        contentP.innerHTML = ""; // Clear existing content
+        const content = comment.content;
+        const mentionRegex = /(@(0x[a-fA-F0-9]{40}))/gi;
+        let lastIndex = 0;
+        let match;
+        const fragment = document.createDocumentFragment();
+
+        while ((match = mentionRegex.exec(content)) !== null) {
+            // Append text before the mention
+            if (match.index > lastIndex) {
+                fragment.appendChild(
+                    document.createTextNode(content.substring(lastIndex, match.index))
+                );
+            }
+
+            const mentionedAddress = match[2]; // The address part (0x...)
+
+            const mentionLink = document.createElement("a");
+            mentionLink.href = "#";
+            mentionLink.classList.add("mention-link");
+
+            // Use a span for the name to allow async ENS updates without affecting the '@'
+            const nameHolder = document.createElement("span");
+            nameHolder.textContent = formatAddress(mentionedAddress, nameHolder);
+
+            mentionLink.appendChild(document.createTextNode("@"));
+            mentionLink.appendChild(nameHolder);
+
+            mentionLink.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent comment-level clicks from firing
+                showUserProfile(mentionedAddress);
+            };
+
+            fragment.appendChild(mentionLink);
+            lastIndex = mentionRegex.lastIndex;
+        }
+
+        // Append any remaining text after the last mention
+        if (lastIndex < content.length) {
+            fragment.appendChild(
+                document.createTextNode(content.substring(lastIndex))
+            );
+        }
+
+        // If no mentions were found, the fragment will be empty.
+        if (lastIndex === 0) {
+            contentP.textContent = content;
+        } else {
+            contentP.appendChild(fragment);
+        }
         commentDiv.appendChild(contentP);
 
         if (comment.channelId && String(comment.channelId) !== "0") {
@@ -1154,11 +1523,21 @@ document.addEventListener("DOMContentLoaded", () => {
         let commentsToDisplay;
 
         if (currentProfileFilter) {
+            // --- Add this block ---
+            // When in profile view, ensure mentions container is hidden
+            // and comments container is visible.
+            if (mentionsContainer) mentionsContainer.classList.add("hidden");
+            if (commentsContainer) commentsContainer.classList.remove("hidden");
+            // --- End of added block ---
+
             // Profile view takes precedence. Find all comments by the user and their parent threads.
-            const commentMap = new Map(allFetchedComments.map((c) => [c.id, c]));
+            const commentMap = new Map(
+                allFetchedComments.map((c) => [c.id, c])
+            );
             const userComments = allFetchedComments.filter(
                 (c) =>
-                    c.author.toLowerCase() === currentProfileFilter.toLowerCase()
+                    c.author.toLowerCase() ===
+                    currentProfileFilter.toLowerCase()
             );
             const finalCommentIds = new Set();
 
