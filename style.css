@@ -1,5 +1,6 @@
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
     line-height: 1.6;
     margin: 0;
     padding: 0;
@@ -33,25 +34,25 @@ main {
     margin: 20px auto;
     padding: 20px;
     background-color: #fff;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    display: flex; 
-    gap: 20px; 
+    display: flex;
+    gap: 20px;
 }
 
 #channel-menu {
-    width: 200px; 
-    flex-shrink: 0; 
+    width: 200px;
+    flex-shrink: 0;
     background-color: #f8f9fa;
     padding: 15px;
     border-radius: 6px;
     border: 1px solid #e0e0e0;
-    height: fit-content; 
-    max-height: calc(100vh - 150px); 
+    height: fit-content;
+    max-height: calc(100vh - 150px);
     overflow-y: auto;
 }
 
-#channel-menu h3 { 
+#channel-menu h3 {
     margin-top: 0;
     font-size: 1.1em;
     color: #333;
@@ -88,10 +89,9 @@ main {
 }
 
 #main-content {
-    flex-grow: 1; 
-    min-width: 0; 
+    flex-grow: 1;
+    min-width: 0;
 }
-
 
 .controls {
     margin-bottom: 20px;
@@ -119,7 +119,9 @@ main {
     margin-top: 20px;
 }
 
-.loading-message, .error-message, .no-comments-message {
+.loading-message,
+.error-message,
+.no-comments-message {
     text-align: center;
     font-style: italic;
     color: #7f8c8d;
@@ -133,10 +135,12 @@ main {
     margin-bottom: 12px;
     background-color: #fdfdfd;
     transition: box-shadow 0.2s ease-in-out;
+    position: relative; /* For absolute positioning of children */
+    padding-bottom: 40px; /* Add space at the bottom for icons/links */
 }
 
 .comment:hover {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
 }
 
 .comment-header {
@@ -145,8 +149,8 @@ main {
     margin-bottom: 8px;
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start; 
-    justify-content: space-between; 
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
 .comment-header strong {
@@ -155,35 +159,38 @@ main {
 
 .comment-header-info-left {
     display: flex;
-    flex-wrap: wrap; 
-    align-items: center; 
+    flex-wrap: wrap;
+    align-items: center;
 }
 
-.comment-header-info-left .author,
-.comment-header-info-left .app {
+.comment-header-info-left .author {
     margin-right: 12px;
     white-space: nowrap;
-    margin-bottom: 4px; 
+    margin-bottom: 4px;
+}
+
+.comment-header-info-left .author {
+    display: flex;
+    align-items: center;
 }
 
 .comment-header .date {
     white-space: nowrap;
-    margin-left: 15px; 
-    margin-bottom: 4px; 
+    margin-left: 15px;
+    margin-bottom: 4px;
 }
-
 
 .comment-content {
     margin-top: 5px;
     margin-bottom: 10px;
-    white-space: pre-wrap; 
+    white-space: pre-wrap;
     word-wrap: break-word;
 }
 
 .comment-children {
     margin-top: 10px;
-    padding-left: 20px; 
-    border-left: 2px solid #e0e0e0; 
+    padding-left: 20px;
+    border-left: 2px solid #e0e0e0;
 }
 
 .toggle-replies {
@@ -213,25 +220,45 @@ a:hover {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
+}
+
+.author-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
+    border: 1px solid #ccc;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237f8c8d'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E");
+}
+
+.author-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.3;
+}
+
+.author-link {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.author-details .app {
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-top: 1px;
 }
 
 .comment-channel-display {
     font-size: 0.8em;
-    color: #6c757d; 
-    margin-top: 10px; 
-    padding-top: 5px; 
-}
-
-.comment-tx-link {
-    font-size: 0.8em;
     color: #6c757d;
-    margin-top: 8px;
+    margin-top: 10px;
     padding-top: 5px;
-}
-
-.comment-tx-link a {
-    /* Inherits general 'a' styles */
 }
 
 /* Like Section Styles */
@@ -241,6 +268,9 @@ a:hover {
     gap: 10px;
     margin-top: 10px;
     font-size: 0.9em;
+    position: absolute; /* Position relative to the comment card */
+    bottom: 10px;
+    left: 15px;
 }
 
 .like-count {
@@ -270,6 +300,157 @@ a:hover {
     border-color: #ced4da;
 }
 
+.tx-link-icon {
+    position: absolute;
+    bottom: 12px;
+    right: 15px;
+    color: #95a5a6; /* A subtle color */
+    line-height: 1; /* To prevent extra space */
+}
+
+.tx-link-icon svg {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    transition: transform 0.2s ease;
+}
+
+.tx-link-icon:hover {
+    color: #3498db; /* A brighter hover color */
+    text-decoration: none;
+}
+
+.tx-link-icon:hover svg {
+    transform: scale(1.1);
+}
+
+/* Profile Section Styles */
+#user-profile {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    padding: 4px 8px;
+    border-radius: 20px;
+    transition: background-color 0.2s ease;
+}
+
+#user-profile:hover {
+    background-color: #3e5167; /* Slightly darker than header */
+}
+
+#user-profile .author-avatar {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+#profile-name {
+    color: #ecf0f1;
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#logout-popup {
+    position: absolute;
+    top: 110%;
+    right: 0;
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: 1010;
+    overflow: hidden;
+    width: 150px;
+}
+
+#logout-popup button {
+    display: block;
+    width: 100%;
+    padding: 12px 15px;
+    background: none;
+    border: none;
+    color: #333;
+    text-align: left;
+    font-size: 0.95em;
+    cursor: pointer;
+}
+
+#logout-popup button:hover {
+    background-color: #f4f7f6;
+}
+
+/* --- Add all the following styles --- */
+
+.like-tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: default; /* So it doesn't show a text selection cursor */
+}
+
+.like-tooltip {
+    display: none; /* Hidden by default */
+    position: absolute;
+    bottom: 120%; /* Position above the like count */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2c3e50; /* Dark background */
+    color: #ecf0f1; /* Light text */
+    padding: 8px 12px;
+    border-radius: 6px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    width: 220px; /* Fixed width */
+    font-size: 0.9em;
+    text-align: left;
+
+    /* Scrollability for more than 5 items */
+    max-height: 150px; /* Approx 5 items + padding */
+    overflow-y: auto;
+
+    /* Hide scrollbar but keep functionality */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.like-tooltip::-webkit-scrollbar {
+    display: none;
+}
+
+/* Show tooltip on hover */
+.like-tooltip-container:hover .like-tooltip {
+    display: block;
+}
+
+/* Arrow pointing down */
+.like-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%; /* At the bottom of the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #2c3e50 transparent transparent transparent;
+}
+
+.tooltip-liker {
+    padding: 4px 0;
+    border-bottom: 1px solid #3e5167; /* Separator line */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tooltip-liker:last-child {
+    border-bottom: none;
+}
+
+/* --- End of new styles --- */
 
 /* Burger Menu Button Styles */
 #burger-menu-button {
@@ -315,14 +496,14 @@ a:hover {
     max-width: 200px; /* Adjust as needed */
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap; 
+    white-space: nowrap;
     text-align: center; /* If text is shorter than max-width */
 }
 #connect-wallet-button:disabled {
     background-color: #95a5a6;
     cursor: default;
     /* Ensure text color remains readable when disabled and potentially long */
-    color: #e0e0e0; 
+    color: #e0e0e0;
 }
 /* Removed #wallet-status rule */
 
@@ -332,7 +513,7 @@ a:hover {
     border-radius: 6px;
     margin-bottom: 25px;
     border: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 #new-comment-area h3 {
     margin-top: 0;
@@ -368,7 +549,8 @@ a:hover {
     background-color: #95a5a6;
     cursor: not-allowed;
 }
-.status-message { /* General class for status messages */
+.status-message {
+    /* General class for status messages */
     margin-top: 10px;
     font-size: 0.9em;
     padding: 8px;
@@ -379,8 +561,12 @@ a:hover {
 /* Reply Button and Form Styles */
 .reply-button-container {
     margin-top: 10px; /* Ensure spacing if like section is also present */
+    position: absolute; /* Position relative to the comment card */
+    bottom: 10px;
+    left: 150px; /* Adjust based on like section width */
 }
-.reply-button, .reply-form button {
+.reply-button,
+.reply-form button {
     font-size: 0.85em;
     padding: 5px 10px;
     margin-right: 8px;
@@ -435,12 +621,11 @@ a:hover {
 .reply-form .cancel-reply-button:hover {
     background-color: #dadedf;
 }
-.reply-status-message { 
-    font-size: 0.85em !important; 
+.reply-status-message {
+    font-size: 0.85em !important;
     margin-top: 8px !important;
-    padding: 5px !important; 
+    padding: 5px !important;
 }
-
 
 /* Media Query for Mobile View */
 @media (max-width: 768px) {
@@ -454,30 +639,30 @@ a:hover {
 
     #burger-menu-button.open {
         position: fixed;
-        top: 15px;   
-        left: 15px;  
+        top: 15px;
+        left: 15px;
     }
 
     main {
-        flex-direction: column; 
+        flex-direction: column;
     }
 
     #channel-menu {
-        position: fixed; 
+        position: fixed;
         left: 0;
-        top: 0; 
-        width: 250px; 
-        height: 100vh; 
+        top: 0;
+        width: 250px;
+        height: 100vh;
         background-color: #f8f9fa;
-        z-index: 1000; 
-        transform: translateX(-100%); 
+        z-index: 1000;
+        transform: translateX(-100%);
         transition: transform 0.3s ease-in-out;
-        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        padding: 60px 15px 15px 15px; 
-        overflow-y: auto; 
-        max-height: 100vh; 
-        border-right: 1px solid #ccc; 
-        box-sizing: border-box; 
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+        padding: 60px 15px 15px 15px;
+        overflow-y: auto;
+        max-height: 100vh;
+        border-right: 1px solid #ccc;
+        box-sizing: border-box;
     }
 
     #channel-menu.open {
@@ -485,8 +670,8 @@ a:hover {
     }
 
     #main-content {
-        width: 100%; 
-        margin-left: 0; 
+        width: 100%;
+        margin-left: 0;
     }
 
     body.menu-open-overlay::after {
@@ -497,7 +682,7 @@ a:hover {
         width: 100%;
         height: 100%;
         background-color: rgba(0, 0, 0, 0.5);
-        z-index: 999; 
+        z-index: 999;
     }
 
     #connect-wallet-button {
