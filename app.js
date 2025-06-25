@@ -88,6 +88,7 @@ let ensCache = new Map();
 let pendingEnsLookups = new Map();
 let avatarCache = new Map();
 let pendingAvatarLookups = new Map();
+let currentProfileFilter = null; // Add this for the new view
 
 document.addEventListener("DOMContentLoaded", () => {
     const refreshButton = document.getElementById("refresh-button");
@@ -100,6 +101,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const profileNameSpan = document.getElementById("profile-name");
     const logoutPopup = document.getElementById("logout-popup");
     const logoutButton = document.getElementById("logout-button");
+    const profileViewHeader = document.getElementById("profile-view-header");
+    const profileViewAvatar = document.getElementById("profile-view-avatar");
+    const profileViewName = document.getElementById("profile-view-name");
+    const backToCommentsButton = document.getElementById(
+        "back-to-comments-button"
+    );
 
     // New DOM Elements
     const connectWalletButton = document.getElementById(
@@ -361,7 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 resolveAndApplyAvatar(userAddress, profileAvatarDiv);
             }
 
-            if (newCommentArea) newCommentArea.style.display = "block";
+            updateNewCommentAreaVisibility();
             showPostStatus("", false);
             initializeCommentsView(); // Refresh comments, reply buttons will now be enabled
         } catch (error) {
@@ -512,6 +519,7 @@ document.addEventListener("DOMContentLoaded", () => {
         userAddress = null;
         isOnCorrectNetwork = false;
         selectedProviderDetail = null;
+        hideUserProfile(); // Add this to exit profile view on logout
 
         // Reset UI
         if (userProfileDiv) userProfileDiv.classList.add("hidden");
@@ -524,10 +532,59 @@ document.addEventListener("DOMContentLoaded", () => {
                     ? "Connect Wallet"
                     : "No Wallets Found";
         }
-        if (newCommentArea) newCommentArea.style.display = "none";
+        updateNewCommentAreaVisibility();
 
         // Re-render comments to update UI state (disable like/reply)
         initializeCommentsView();
+    }
+
+    function updateNewCommentAreaVisibility() {
+        if (!newCommentArea) return;
+
+        const isConnectedAndOnCorrectNetwork = userAddress && isOnCorrectNetwork;
+
+        // Context is postable if we are NOT in a profile view,
+        // OR if we are viewing our OWN profile.
+        const isPostableContext =
+            !currentProfileFilter ||
+            (currentProfileFilter &&
+                userAddress &&
+                currentProfileFilter.toLowerCase() === userAddress.toLowerCase());
+
+        if (isConnectedAndOnCorrectNetwork && isPostableContext) {
+            newCommentArea.style.display = "block";
+        } else {
+            newCommentArea.style.display = "none";
+        }
+    }
+
+    function showUserProfile(authorAddress) {
+        currentProfileFilter = authorAddress;
+        currentChannelFilter = null; // Deactivate channel filter
+
+        // Populate and show the profile header
+        if (profileViewHeader) {
+            profileViewName.textContent = formatAddress(
+                authorAddress,
+                profileViewName
+            );
+            resolveAndApplyAvatar(authorAddress, profileViewAvatar);
+            profileViewHeader.classList.remove("hidden");
+        }
+
+        // Re-render comments for the selected author
+        displayFilteredComments();
+        updateNewCommentAreaVisibility();
+    }
+
+    function hideUserProfile() {
+        currentProfileFilter = null;
+        if (profileViewHeader) {
+            profileViewHeader.classList.add("hidden");
+        }
+        // Re-render comments based on the last active channel filter
+        displayFilteredComments(currentChannelFilter);
+        updateNewCommentAreaVisibility();
     }
 
     function processCommentsAndLikes(comments) {
@@ -681,6 +738,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Reset the element's style to default before doing anything else.
+        // This prevents showing a stale avatar from a previous user.
+        elementToUpdate.style.backgroundImage = "";
+
         // 1. Check cache for a completed lookup.
         if (avatarCache.has(address)) {
             const cachedUrl = avatarCache.get(address);
@@ -688,6 +749,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // It's a valid URL
                 elementToUpdate.style.backgroundImage = `url('${cachedUrl}')`;
             }
+            // If no valid URL, the reset style remains, which is correct.
             return;
         }
 
@@ -698,8 +760,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (avatarUrl) {
                     elementToUpdate.style.backgroundImage = `url('${avatarUrl}')`;
                 }
+                // If avatarUrl is null, the reset style remains.
             } catch (e) {
-                // The pending lookup failed, do nothing.
+                // The pending lookup failed, do nothing. The reset style remains.
             }
             return;
         }
@@ -717,6 +780,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 // Cache the address to indicate we've checked and found no avatar
                 avatarCache.set(address, address);
+                // The reset style remains, which is correct.
             }
         } catch (error) {
             console.warn(`Avatar lookup failed for ${address}:`, error);
@@ -755,6 +819,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const avatarDiv = document.createElement("div");
         avatarDiv.classList.add("author-avatar");
+        avatarDiv.style.cursor = "pointer"; // Make it look clickable
+        avatarDiv.title = "View Profile"; // Add a tooltip
+        avatarDiv.onclick = () => showUserProfile(comment.author); // Add this line
         resolveAndApplyAvatar(comment.author, avatarDiv);
 
         const authorDetailsDiv = document.createElement("div");
@@ -834,7 +901,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const likeCountSpan = document.createElement("span");
         likeCountSpan.classList.add("like-count");
-        likeCountSpan.textContent = `❤️ ${currentLikes}`;
+        likeCountSpan.innerHTML = `<img src="https://www.cryptologos.cc/logos/ethereum-eth-logo.svg?v=040" alt="Likes" class="like-icon"> ${currentLikes}`;
         tooltipContainer.appendChild(likeCountSpan);
 
         if (currentLikes > 0) {
@@ -854,8 +921,9 @@ document.addEventListener("DOMContentLoaded", () => {
         likeSectionDiv.appendChild(tooltipContainer);
 
         if (userAddress && isOnCorrectNetwork) {
+            // --- Like Button ---
             const likeButton = document.createElement("button");
-            likeButton.classList.add("like-button");
+            likeButton.classList.add("action-button");
             likeButton.textContent = "Like";
 
             likeButton.onclick = async () => {
@@ -876,30 +944,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         COMMENT_TYPE_REACTION
                     );
                     success = true;
-                    // On success, submitEcpComment schedules a refresh, button will be re-rendered.
                 } catch (error) {
                     // Error message is handled by submitEcpComment.
                 } finally {
                     if (!success) {
-                        // If not successful, reset the button state.
                         likeButton.textContent = "Like";
                         likeButton.disabled = false;
                     }
-                    // If successful, the button is gone due to refresh.
                 }
             };
             likeSectionDiv.appendChild(likeButton);
-        }
-        commentDiv.appendChild(likeSectionDiv);
 
-        if (userAddress && isOnCorrectNetwork) {
-            const replyButtonContainer = document.createElement("div");
-            replyButtonContainer.classList.add("reply-button-container");
+            // --- Reply Button and Form ---
             const replyButton = document.createElement("button");
-            replyButton.classList.add("reply-button");
+            replyButton.classList.add("action-button");
             replyButton.textContent = "Reply";
-            replyButtonContainer.appendChild(replyButton);
-            commentDiv.appendChild(replyButtonContainer);
+            likeSectionDiv.appendChild(replyButton); // Add to same container as Like button
 
             const replyFormDiv = document.createElement("div");
             replyFormDiv.classList.add("reply-form");
@@ -926,16 +986,15 @@ document.addEventListener("DOMContentLoaded", () => {
             replyButton.onclick = () => {
                 const isVisible = replyFormDiv.style.display === "block";
                 replyFormDiv.style.display = isVisible ? "none" : "block";
-                replyButtonContainer.style.display = isVisible
-                    ? "block"
-                    : "none";
+                // Hide the entire action section when replying to avoid clutter
+                likeSectionDiv.style.display = isVisible ? "flex" : "none";
                 if (!isVisible) replyTextarea.focus();
                 showPostStatus("", false, replyStatusMsgElement);
             };
 
             cancelReplyBtn.onclick = () => {
                 replyFormDiv.style.display = "none";
-                replyButtonContainer.style.display = "block";
+                likeSectionDiv.style.display = "flex"; // Show the action section again
                 replyTextarea.value = "";
                 showPostStatus("", false, replyStatusMsgElement);
             };
@@ -959,11 +1018,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         parentChannelId,
                         comment.id,
                         replyStatusMsgElement
-                        // Implicitly commentType 0 for replies
                     );
                     replyTextarea.value = "";
                     replyFormDiv.style.display = "none";
-                    replyButtonContainer.style.display = "block";
+                    likeSectionDiv.style.display = "flex"; // Show the action section again
                 } catch (e) {
                     // Error handled by submitEcpComment
                 } finally {
@@ -972,6 +1030,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             };
         }
+        commentDiv.appendChild(likeSectionDiv);
 
         if (comment.children && comment.children.length > 0) {
             const toggleButton = document.createElement("button");
@@ -997,6 +1056,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function handleChannelClick(filterId) {
+        hideUserProfile(); // Exit profile view when a channel is clicked
         displayFilteredComments(filterId);
         if (window.innerWidth <= 768) {
             if (channelMenu && channelMenu.classList.contains("open")) {
@@ -1085,12 +1145,42 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function displayFilteredComments(filterChannelId) {
-        currentChannelFilter = filterChannelId;
+        // If a channelId is passed, update the global filter state.
+        // This is important for when we return from a profile view.
+        if (filterChannelId !== undefined) {
+            currentChannelFilter = filterChannelId;
+        }
+
         let commentsToDisplay;
-        // allFetchedComments here are content comments (already filtered from likes)
-        if (currentChannelFilter === null) {
+
+        if (currentProfileFilter) {
+            // Profile view takes precedence. Find all comments by the user and their parent threads.
+            const commentMap = new Map(allFetchedComments.map((c) => [c.id, c]));
+            const userComments = allFetchedComments.filter(
+                (c) =>
+                    c.author.toLowerCase() === currentProfileFilter.toLowerCase()
+            );
+            const finalCommentIds = new Set();
+
+            userComments.forEach((userComment) => {
+                finalCommentIds.add(userComment.id);
+                let currentParentId = userComment.parentId;
+                // Traverse up the tree to include the entire conversation thread
+                while (currentParentId && commentMap.has(currentParentId)) {
+                    finalCommentIds.add(currentParentId);
+                    const parentComment = commentMap.get(currentParentId);
+                    currentParentId = parentComment.parentId;
+                }
+            });
+
+            commentsToDisplay = allFetchedComments.filter((c) =>
+                finalCommentIds.has(c.id)
+            );
+        } else if (currentChannelFilter === null) {
+            // 'All Comments' view
             commentsToDisplay = allFetchedComments;
         } else if (currentChannelFilter === 0) {
+            // 'No Channel' view
             commentsToDisplay = allFetchedComments.filter(
                 (comment) =>
                     comment.channelId === null ||
@@ -1099,6 +1189,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     String(comment.channelId) === "0"
             );
         } else {
+            // Specific channel view
             commentsToDisplay = allFetchedComments.filter(
                 (comment) =>
                     String(comment.channelId) === String(currentChannelFilter)
@@ -1107,20 +1198,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
         commentsContainer.innerHTML = "";
         if (commentsToDisplay.length === 0) {
-            if (allFetchedComments.length > 0) {
-                // Content comments exist, but not for this filter
-                showNoCommentsMessage("No comments found for this filter.");
-            } else {
-                // No content comments at all (after initial processing)
-                // This case is handled by initializeCommentsView before calling displayFilteredComments
-                // However, if allFetchedComments was empty to begin with, this is the right message.
-                showNoCommentsMessage();
+            let message = "No comments found for this filter.";
+            if (currentProfileFilter) {
+                message = "This user has not posted any comments.";
+            } else if (allFetchedComments.length === 0) {
+                message = "No comments found.";
             }
+            showNoCommentsMessage(message);
         } else {
             const commentTree = buildCommentTree(commentsToDisplay);
             if (commentTree.length === 0 && commentsToDisplay.length > 0) {
                 showNoCommentsMessage(
-                    "No root comments for this filter. All matching items might be replies."
+                    "This user has not made any top-level posts (all comments are replies)."
                 );
             } else {
                 commentTree.forEach((comment) => {
@@ -1139,7 +1228,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             // For background refresh, provide a subtle loading indicator
             if (refreshButton) {
-                refreshButton.textContent = "Refreshing...";
+                refreshButton.classList.add("loading");
                 refreshButton.disabled = true;
             }
             // Do NOT call the global showLoadingMessage() here for background refreshes.
@@ -1170,7 +1259,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 // Finalize button state for background refresh if it was one
                 if (!wasInitialLoad && refreshButton) {
-                    refreshButton.textContent = "Refresh Comments";
+                    refreshButton.classList.remove("loading");
                     refreshButton.disabled = false;
                 }
                 return; // Exit early as there's nothing to display via displayFilteredComments.
@@ -1205,7 +1294,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             // Re-enable refresh button if it was a background refresh.
             if (!wasInitialLoad && refreshButton) {
-                refreshButton.textContent = "Refresh Comments";
+                refreshButton.classList.remove("loading");
                 refreshButton.disabled = false;
             }
             // If it was an initial load, the refresh button wasn't in a "Refreshing..." state.
@@ -1216,9 +1305,16 @@ document.addEventListener("DOMContentLoaded", () => {
         refreshButton.addEventListener("click", initializeCommentsView);
     }
     if (logoElement) {
-        logoElement.addEventListener("click", () => handleChannelClick(null));
+        logoElement.addEventListener("click", () => {
+            hideUserProfile();
+            handleChannelClick(null);
+        });
     } else {
         console.warn("Logo element with ID 'logo' not found.");
+    }
+
+    if (backToCommentsButton) {
+        backToCommentsButton.addEventListener("click", hideUserProfile);
     }
 
     if (connectWalletButton) {
