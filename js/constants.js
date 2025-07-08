@@ -1,7 +1,8 @@
 // js/constants.js
 
 // ECP contract
-export const COMMENT_MANAGER_ADDRESS = "0xb262C9278fBcac384Ef59Fc49E24d800152E19b1";
+export const COMMENT_MANAGER_ADDRESS =
+    "0xb262C9278fBcac384Ef59Fc49E24d800152E19b1";
 export const ICommentManagerABI = [
     {
         type: "function",
@@ -53,7 +54,9 @@ export const ICommentManagerABI = [
             },
             {name: "appSignature", type: "bytes", internalType: "bytes"},
         ],
-        outputs: [{name: "commentId", type: "bytes32", internalType: "bytes32"}],
+        outputs: [
+            {name: "commentId", type: "bytes32", internalType: "bytes32"},
+        ],
         stateMutability: "nonpayable",
     },
 ];
@@ -64,7 +67,7 @@ export const TARGET_CHAIN_ID_HEX = "0x2105"; // Hex representation of 8453
 export const BASE_RPC_URL = "https://base.llamarpc.com";
 export const BASE_EXPLORER_URL = "https://basescan.org";
 export const BASE_CHAIN_NAME = "Base Mainnet";
-export const ETH_MAINNET_RPC_URL = "https://1rpc.io/eth";
+export const ETH_MAINNET_RPC_URL = "https://ethereum-rpc.publicnode.com";
 
 // ECP Comment Types
 export const COMMENT_TYPE_REACTION = 1;
@@ -95,4 +98,6 @@ export const COMMENT_FETCH_LIMIT = 100;
 export const MAX_COMMENT_LENGTH = 300;
 
 // ENS Provider (can be shared)
-export const ensProvider = new window.ethers.providers.JsonRpcProvider(ETH_MAINNET_RPC_URL);
+export const ensProvider = new window.ethers.providers.JsonRpcProvider(
+    ETH_MAINNET_RPC_URL
+);
