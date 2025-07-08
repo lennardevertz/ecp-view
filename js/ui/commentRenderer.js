@@ -1,12 +1,15 @@
 // js/ui/commentRenderer.js
 
-import { MAX_COMMENT_LENGTH } from '../constants.js';
+import { MAX_COMMENT_LENGTH, ensProvider } from '../constants.js';
 
 function renderContentWithEmbeds(content, formatters, callbacks) {
     const { formatAddress } = formatters;
     const { onProfileClick } = callbacks;
     const fragment = document.createDocumentFragment();
-    const combinedRegex = /(https?:\/\/[^\s]+)|(@(0x[a-fA-F0-9]{40}))/gi;
+    
+    // Updated regex to also capture standalone .eth names
+    const combinedRegex = /(https?:\/\/[^\s]+)|(@(0x[a-fA-F0-9]{40}))|(\b[a-zA-Z0-9-]+\.eth\b)/gi;
+    
     const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
     let lastIndex = 0;
     let match;
@@ -17,6 +20,7 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
         }
         const urlMatch = match[1];
         const mentionAddress = match[3];
+        const ensNameMatch = match[4]; // New capture group for .eth names
 
         if (urlMatch) {
             const link = document.createElement('a');
@@ -49,7 +53,45 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
                 onProfileClick(mentionAddress);
             };
             fragment.appendChild(mentionLink);
+        } else if (ensNameMatch) {
+            // Logic to handle clickable .eth names
+            const ensLink = document.createElement("a");
+            ensLink.href = "#";
+            ensLink.classList.add("mention-link");
+            ensLink.textContent = ensNameMatch;
+
+            ensLink.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (ensLink.dataset.resolving === 'true') return;
+                ensLink.dataset.resolving = 'true';
+                ensLink.style.cursor = 'wait';
+
+                try {
+                    const resolvedAddress = await ensProvider.resolveName(ensNameMatch);
+                    if (resolvedAddress) {
+                        onProfileClick(resolvedAddress);
+                    } else {
+                        ensLink.title = `Could not resolve ${ensNameMatch}`;
+                        ensLink.style.textDecoration = 'line-through';
+                        ensLink.style.color = '#95a5a6';
+                        ensLink.onclick = (ev) => ev.preventDefault(); // Disable future clicks
+                    }
+                } catch (error) {
+                    console.error(`Failed to resolve ENS name ${ensNameMatch}:`, error);
+                    ensLink.title = 'Error during resolution';
+                    ensLink.style.textDecoration = 'line-through';
+                    ensLink.style.color = '#e74c3c';
+                    ensLink.onclick = (ev) => ev.preventDefault();
+                } finally {
+                    ensLink.style.cursor = 'pointer';
+                    delete ensLink.dataset.resolving;
+                }
+            };
+            fragment.appendChild(ensLink);
         }
+        
         lastIndex = combinedRegex.lastIndex;
     }
     if (lastIndex < content.length) {

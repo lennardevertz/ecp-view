@@ -1,9 +1,9 @@
 // js/ui/index.js
 
-import * as constants from '../constants.js';
-import { fetchComments } from '../api.js';
-import * as wallet from '../wallet.js';
-import { renderComment } from './commentRenderer.js';
+import * as constants from "../constants.js";
+import {fetchComments} from "../api.js";
+import * as wallet from "../wallet.js";
+import {renderComment} from "./commentRenderer.js";
 
 // --- State ---
 let allFetchedComments = [];
@@ -54,14 +54,21 @@ function buildCommentTree(comments) {
 }
 
 function formatAddress(address, elementToUpdate = null) {
-    if (!address) return '';
+    if (!address) return "";
     if (ensCache.has(address)) {
         const cached = ensCache.get(address);
         if (cached !== address) return cached;
     }
-    const shortAddress = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    const shortAddress = `${address.substring(0, 6)}...${address.substring(
+        address.length - 4
+    )}`;
     const resolveAndApplyEns = async () => {
-        if (!elementToUpdate || !window.ethers.utils.isAddress(address) || pendingEnsLookups.has(address)) return;
+        if (
+            !elementToUpdate ||
+            !window.ethers.utils.isAddress(address) ||
+            pendingEnsLookups.has(address)
+        )
+            return;
         try {
             const lookupPromise = constants.ensProvider.lookupAddress(address);
             pendingEnsLookups.set(address, lookupPromise);
@@ -113,16 +120,30 @@ async function resolveAndApplyAvatar(address, elementToUpdate) {
 function formatDate(timestamp) {
     if (!timestamp) return "Unknown date";
     return new Date(parseInt(timestamp)).toLocaleString(undefined, {
-        year: "numeric", month: "numeric", day: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: true,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
     });
 }
 
 // --- UI Update Functions ---
-function showLoadingMessage(message = "Loading comments...") { dom.commentsContainer.innerHTML = `<p class="loading-message">${message}</p>`; }
-function showErrorMessage(message = "Error loading comments.") { dom.commentsContainer.innerHTML = `<p class="error-message">${message}</p>`; }
-function showNoCommentsMessage(message = "No comments found.") { dom.commentsContainer.innerHTML = `<p class="no-comments-message">${message}</p>`; }
-function showPostStatus(message, isError = false, element = dom.postStatusMessage) {
+function showLoadingMessage(message = "Loading comments...") {
+    dom.commentsContainer.innerHTML = `<p class="loading-message">${message}</p>`;
+}
+function showErrorMessage(message = "Error loading comments.") {
+    dom.commentsContainer.innerHTML = `<p class="error-message">${message}</p>`;
+}
+function showNoCommentsMessage(message = "No comments found.") {
+    dom.commentsContainer.innerHTML = `<p class="no-comments-message">${message}</p>`;
+}
+function showPostStatus(
+    message,
+    isError = false,
+    element = dom.postStatusMessage
+) {
     element.textContent = message;
     element.style.color = isError ? "red" : "green";
     element.style.display = message ? "block" : "none";
@@ -132,7 +153,11 @@ function processCommentsAndLikes(comments) {
     const newLikerLists = new Map();
     const contentComments = [];
     comments.forEach((comment) => {
-        if (comment.commentType === constants.COMMENT_TYPE_REACTION && comment.content === constants.REACTION_CONTENT_LIKE && comment.parentId) {
+        if (
+            comment.commentType === constants.COMMENT_TYPE_REACTION &&
+            comment.content === constants.REACTION_CONTENT_LIKE &&
+            comment.parentId
+        ) {
             if (!newLikerLists.has(comment.parentId)) {
                 newLikerLists.set(comment.parentId, new Set());
             }
@@ -141,7 +166,7 @@ function processCommentsAndLikes(comments) {
             contentComments.push(comment);
         }
     });
-    return { contentComments, newLikerLists };
+    return {contentComments, newLikerLists};
 }
 
 function displayFilteredComments(filterChannelId) {
@@ -154,7 +179,7 @@ function displayFilteredComments(filterChannelId) {
     if (currentProfileFilter) {
         dom.mentionsContainer.classList.add("hidden");
         dom.commentsContainer.classList.remove("hidden");
-        
+
         const commentMap = new Map(allFetchedComments.map((c) => [c.id, c]));
         const userComments = allFetchedComments.filter(
             (c) => c.author.toLowerCase() === currentProfileFilter.toLowerCase()
@@ -171,12 +196,15 @@ function displayFilteredComments(filterChannelId) {
             }
         });
 
-        commentsToDisplay = allFetchedComments.filter((c) => finalCommentIds.has(c.id));
+        commentsToDisplay = allFetchedComments.filter((c) =>
+            finalCommentIds.has(c.id)
+        );
     } else if (currentChannelFilter === null) {
         commentsToDisplay = allFetchedComments;
     } else {
         commentsToDisplay = allFetchedComments.filter(
-            (comment) => String(comment.channelId || 0) === String(currentChannelFilter)
+            (comment) =>
+                String(comment.channelId || 0) === String(currentChannelFilter)
         );
     }
 
@@ -192,10 +220,14 @@ function displayFilteredComments(filterChannelId) {
     } else {
         const commentTree = buildCommentTree(commentsToDisplay);
         if (commentTree.length === 0 && commentsToDisplay.length > 0) {
-            showNoCommentsMessage("This user has not made any top-level posts (all comments are replies).");
+            showNoCommentsMessage(
+                "This user has not made any top-level posts (all comments are replies)."
+            );
         } else {
-            commentTree.forEach(comment => {
-                dom.commentsContainer.appendChild(createCommentElement(comment, 0));
+            commentTree.forEach((comment) => {
+                dom.commentsContainer.appendChild(
+                    createCommentElement(comment, 0)
+                );
             });
         }
     }
@@ -204,7 +236,7 @@ function displayFilteredComments(filterChannelId) {
 
 function renderChannelMenu() {
     dom.channelMenu.innerHTML = "<h3>Channels</h3>";
-    
+
     const channelIds = new Set();
     let hasNoChannelComments = false;
     allFetchedComments.forEach((comment) => {
@@ -228,7 +260,12 @@ function renderChannelMenu() {
 
     dom.channelMenu.appendChild(createButton("All Comments", null));
 
-    if (hasNoChannelComments || (allFetchedComments.length > 0 && !channelIds.size && !hasNoChannelComments)) {
+    if (
+        hasNoChannelComments ||
+        (allFetchedComments.length > 0 &&
+            !channelIds.size &&
+            !hasNoChannelComments)
+    ) {
         const noChannelButton = createButton("No Channel", 0);
         if (currentChannelFilter === 0 && currentChannelFilter !== null) {
             noChannelButton.classList.add("active-channel");
@@ -245,9 +282,13 @@ function renderChannelMenu() {
         return valA.localeCompare(valB);
     });
 
-    sortedChannelIds.forEach(id => {
+    sortedChannelIds.forEach((id) => {
         const channelButton = createButton(`Channel: ${id}`, id);
-        if (currentChannelFilter !== null && currentChannelFilter !== 0 && String(currentChannelFilter) === String(id)) {
+        if (
+            currentChannelFilter !== null &&
+            currentChannelFilter !== 0 &&
+            String(currentChannelFilter) === String(id)
+        ) {
             channelButton.classList.add("active-channel");
         }
         dom.channelMenu.appendChild(channelButton);
@@ -255,9 +296,16 @@ function renderChannelMenu() {
 }
 
 function updateNewCommentAreaVisibility() {
-    const isConnected = wallet.getUserAddress() && wallet.getIsOnCorrectNetwork();
-    const isPostableContext = !currentProfileFilter || (currentProfileFilter && wallet.getUserAddress() && currentProfileFilter.toLowerCase() === wallet.getUserAddress().toLowerCase());
-    dom.newCommentArea.style.display = (isConnected && isPostableContext) ? "block" : "none";
+    const isConnected =
+        wallet.getUserAddress() && wallet.getIsOnCorrectNetwork();
+    const isPostableContext =
+        !currentProfileFilter ||
+        (currentProfileFilter &&
+            wallet.getUserAddress() &&
+            currentProfileFilter.toLowerCase() ===
+                wallet.getUserAddress().toLowerCase());
+    dom.newCommentArea.style.display =
+        isConnected && isPostableContext ? "block" : "none";
 }
 
 function hideUserProfile() {
@@ -277,13 +325,16 @@ function hideUserProfile() {
 function showUserProfile(authorAddress) {
     currentProfileFilter = authorAddress;
     currentChannelFilter = null;
-    dom.profileViewName.textContent = formatAddress(authorAddress, dom.profileViewName);
+    dom.profileViewName.textContent = formatAddress(
+        authorAddress,
+        dom.profileViewName
+    );
     resolveAndApplyAvatar(authorAddress, dom.profileViewAvatar);
     dom.profileViewHeader.classList.remove("hidden");
     dom.profileViewTabs.classList.remove("hidden");
     dom.profileCommentsTab.classList.add("active");
     dom.profileMentionsTab.classList.remove("active");
-    
+
     dom.profileCommentsTab.onclick = () => {
         dom.profileCommentsTab.classList.add("active");
         dom.profileMentionsTab.classList.remove("active");
@@ -297,11 +348,14 @@ function showUserProfile(authorAddress) {
 
     displayFilteredComments();
     updateNewCommentAreaVisibility();
-    
+
     fetchAndDisplayFollowerStats(authorAddress);
     fetchAndDisplayEnsDetails(authorAddress);
     const viewerAddress = wallet.getUserAddress();
-    if (viewerAddress && viewerAddress.toLowerCase() !== authorAddress.toLowerCase()) {
+    if (
+        viewerAddress &&
+        viewerAddress.toLowerCase() !== authorAddress.toLowerCase()
+    ) {
         fetchAndDisplayFollowState(authorAddress, viewerAddress);
         fetchAndDisplayCommonFollowers(authorAddress, viewerAddress);
     } else {
@@ -318,12 +372,18 @@ function createCommentElement(comment, depth) {
             isOnCorrectNetwork: wallet.getIsOnCorrectNetwork(),
             likerLists,
         },
-        formatters: { formatDate, formatAddress, resolveAndApplyAvatar },
+        formatters: {formatDate, formatAddress, resolveAndApplyAvatar},
         callbacks: {
             onProfileClick: showUserProfile,
             onReply: async (parentComment, content, statusElement) => {
                 try {
-                    await wallet.submitEcpComment(content, parentComment.channelId, parentComment.id, statusElement, showPostStatus);
+                    await wallet.submitEcpComment(
+                        content,
+                        parentComment.channelId,
+                        parentComment.id,
+                        statusElement,
+                        showPostStatus
+                    );
                     return true;
                 } catch {
                     return false;
@@ -331,13 +391,20 @@ function createCommentElement(comment, depth) {
             },
             onLike: async (parentComment) => {
                 try {
-                    await wallet.submitEcpComment(constants.REACTION_CONTENT_LIKE, parentComment.channelId, parentComment.id, dom.postStatusMessage, showPostStatus, constants.COMMENT_TYPE_REACTION);
+                    await wallet.submitEcpComment(
+                        constants.REACTION_CONTENT_LIKE,
+                        parentComment.channelId,
+                        parentComment.id,
+                        dom.postStatusMessage,
+                        showPostStatus,
+                        constants.COMMENT_TYPE_REACTION
+                    );
                     return true;
                 } catch {
                     return false;
                 }
-            }
-        }
+            },
+        },
     };
     return renderComment(comment, config);
 }
@@ -347,14 +414,17 @@ async function loadMoreComments() {
     isLoadingMore = true;
     dom.refreshButton.classList.add("loading");
     try {
-        const { items: newRawComments, pageInfo } = await fetchComments(currentCursor);
+        const {items: newRawComments, pageInfo} = await fetchComments(
+            currentCursor
+        );
         if (newRawComments && newRawComments.length > 0) {
-            const { contentComments: newContentComments, newLikerLists } = processCommentsAndLikes(newRawComments);
-            
+            const {contentComments: newContentComments, newLikerLists} =
+                processCommentsAndLikes(newRawComments);
+
             // Merge liker lists
             newLikerLists.forEach((value, key) => {
                 if (likerLists.has(key)) {
-                    value.forEach(liker => likerLists.get(key).add(liker));
+                    value.forEach((liker) => likerLists.get(key).add(liker));
                 } else {
                     likerLists.set(key, value);
                 }
@@ -364,8 +434,10 @@ async function loadMoreComments() {
             currentCursor = pageInfo.endCursor;
             hasNextPage = pageInfo.hasNextPage;
             const newCommentTree = buildCommentTree(newContentComments);
-            newCommentTree.forEach(comment => {
-                dom.commentsContainer.appendChild(createCommentElement(comment, 0));
+            newCommentTree.forEach((comment) => {
+                dom.commentsContainer.appendChild(
+                    createCommentElement(comment, 0)
+                );
             });
         } else {
             hasNextPage = false;
@@ -390,8 +462,10 @@ async function initializeCommentsView() {
     likerLists.clear();
 
     try {
-        const { items: rawFetchedComments, pageInfo } = await fetchComments();
-        const { contentComments, newLikerLists } = processCommentsAndLikes(rawFetchedComments || []);
+        const {items: rawFetchedComments, pageInfo} = await fetchComments();
+        const {contentComments, newLikerLists} = processCommentsAndLikes(
+            rawFetchedComments || []
+        );
         likerLists = newLikerLists;
         allFetchedComments = contentComments;
         currentCursor = pageInfo.endCursor;
@@ -405,7 +479,8 @@ async function initializeCommentsView() {
         }
         if (wasInitialLoad) isInitialLoad = false;
     } catch (error) {
-        if (wasInitialLoad) showErrorMessage(`Failed to load comments: ${error.message}`);
+        if (wasInitialLoad)
+            showErrorMessage(`Failed to load comments: ${error.message}`);
         else console.error("Background refresh failed:", error);
     } finally {
         if (!wasInitialLoad) dom.refreshButton.classList.remove("loading");
@@ -414,7 +489,11 @@ async function initializeCommentsView() {
 
 // --- Profile View Specific Functions ---
 function updateFollowerStatsUI(stats) {
-    if (stats && stats.followers_count !== undefined && stats.following_count !== undefined) {
+    if (
+        stats &&
+        stats.followers_count !== undefined &&
+        stats.following_count !== undefined
+    ) {
         dom.profileFollowers.textContent = `${stats.followers_count} Followers`;
         dom.profileFollowing.textContent = `${stats.following_count} Following`;
         dom.profileViewStats.classList.remove("hidden");
@@ -429,13 +508,19 @@ async function fetchAndDisplayFollowerStats(address) {
         return;
     }
     try {
-        const response = await fetch(`https://api.ethfollow.xyz/api/v1/users/${address}/stats`);
-        if (!response.ok) throw new Error(`API returned status ${response.status}`);
+        const response = await fetch(
+            `https://api.ethfollow.xyz/api/v1/users/${address}/stats`
+        );
+        if (!response.ok)
+            throw new Error(`API returned status ${response.status}`);
         const stats = await response.json();
         followerStatsCache.set(address, stats);
         updateFollowerStatsUI(stats);
     } catch (error) {
-        console.warn(`Could not fetch follower stats for ${address}:`, error.message);
+        console.warn(
+            `Could not fetch follower stats for ${address}:`,
+            error.message
+        );
         followerStatsCache.set(address, null);
         updateFollowerStatsUI(null);
     }
@@ -465,7 +550,12 @@ function updateEnsDetailsUI(data) {
         if (value) {
             hasSocials = true;
             const link = document.createElement("a");
-            link.href = key === "twitter" ? `https://twitter.com/${value}` : key === "github" ? `https://github.com/${value}` : "#";
+            link.href =
+                key === "twitter"
+                    ? `https://twitter.com/${value}`
+                    : key === "github"
+                    ? `https://github.com/${value}`
+                    : "#";
             link.target = "_blank";
             link.rel = "noopener noreferrer";
             link.title = `${key}: ${value}`;
@@ -481,7 +571,9 @@ async function fetchAndDisplayEnsDetails(address) {
         return;
     }
     try {
-        const response = await fetch(`https://api.ethfollow.xyz/api/v1/users/${address}/ens`);
+        const response = await fetch(
+            `https://api.ethfollow.xyz/api/v1/users/${address}/ens`
+        );
         if (!response.ok) throw new Error(`API error ${response.status}`);
         const data = await response.json();
         ensDetailsCache.set(address, data);
@@ -518,7 +610,9 @@ async function fetchAndDisplayFollowState(profileAddress, viewerAddress) {
         return;
     }
     try {
-        const response = await fetch(`https://api.ethfollow.xyz/api/v1/users/${profileAddress}/${viewerAddress}/followerState`);
+        const response = await fetch(
+            `https://api.ethfollow.xyz/api/v1/users/${profileAddress}/${viewerAddress}/followerState`
+        );
         if (!response.ok) throw new Error(`API error ${response.status}`);
         const data = await response.json();
         followStateCache.set(cacheKey, data.state);
@@ -536,7 +630,9 @@ function updateCommonFollowersUI(data) {
         data.results.slice(0, 10).forEach((follower) => {
             const item = document.createElement("div");
             item.classList.add("common-follower-item");
-            item.innerHTML = `<div class="author-avatar"></div><span>${follower.name || formatAddress(follower.address)}</span>`;
+            item.innerHTML = `<div class="author-avatar"></div><span>${
+                follower.name || formatAddress(follower.address)
+            }</span>`;
             const avatar = item.querySelector(".author-avatar");
             if (follower.avatar) {
                 avatar.style.backgroundImage = `url('${follower.avatar}')`;
@@ -559,7 +655,9 @@ async function fetchAndDisplayCommonFollowers(profileAddress, viewerAddress) {
         return;
     }
     try {
-        const response = await fetch(`https://api.ethfollow.xyz/api/v1/users/${profileAddress}/commonFollowers?leader=${viewerAddress}`);
+        const response = await fetch(
+            `https://api.ethfollow.xyz/api/v1/users/${profileAddress}/commonFollowers?leader=${viewerAddress}`
+        );
         if (!response.ok) throw new Error(`API error ${response.status}`);
         const data = await response.json();
         commonFollowersCache.set(cacheKey, data);
@@ -575,7 +673,37 @@ function displayProfileMentions() {
     if (!currentProfileFilter) return;
     dom.commentsContainer.classList.add("hidden");
     dom.mentionsContainer.classList.remove("hidden");
-    const mentions = allFetchedComments.filter((c) => c.content.toLowerCase().includes(`@${currentProfileFilter.toLowerCase()}`));
+    const profileAddress = currentProfileFilter.toLowerCase();
+
+    // Check our cache for a known ENS name for the current user profile
+    const profileEnsName = ensCache.get(currentProfileFilter);
+    console.log(profileEnsName);
+    const hasRealEnsName = profileEnsName && profileEnsName.includes(".");
+
+    const mentions = allFetchedComments.filter((c) => {
+        const contentLower = c.content.toLowerCase();
+
+        // Condition 1: Check for direct address mention, e.g., "@0x123..."
+        if (contentLower.includes(`@${profileAddress}`)) {
+            return true;
+        }
+
+        // Condition 2: If an ENS name is known, check for mentions of it.
+        // This will find "vitalik.eth" and "@vitalik.eth" correctly.
+        if (hasRealEnsName) {
+            // Use a regex with word boundaries (\b) to avoid partial matches
+            const ensRegex = new RegExp(
+                `\\b${profileEnsName.replace(/\./g, "\\.")}\\b`,
+                "i"
+            );
+            if (ensRegex.test(contentLower)) {
+                return true;
+            }
+        }
+
+        return false;
+    });
+
     dom.mentionsContainer.innerHTML = "";
     if (mentions.length > 0) {
         const sortedMentions = mentions.sort(sortByDate);
@@ -591,7 +719,10 @@ function displayProfileMentions() {
 function handleChannelClick(filterId) {
     hideUserProfile();
     displayFilteredComments(filterId);
-    if (window.innerWidth <= 768 && dom.channelMenu.classList.contains("open")) {
+    if (
+        window.innerWidth <= 768 &&
+        dom.channelMenu.classList.contains("open")
+    ) {
         dom.channelMenu.classList.remove("open");
         dom.burgerMenuButton.classList.remove("open");
         document.body.classList.remove("menu-open-overlay");
@@ -602,33 +733,61 @@ function handleChannelClick(filterId) {
 export function init() {
     // Assign DOM elements
     const elementIds = [
-        'refresh-button', 'comments-container', 'logo', 'burger-menu-button', 'channel-menu',
-        'user-profile', 'profile-avatar', 'profile-name', 'logout-popup', 'logout-button',
-        'profile-view-header', 'profile-view-avatar', 'profile-view-name', 'back-to-comments-button',
-        'profile-view-stats', 'profile-followers', 'profile-following', 'profile-follow-state',
-        'profile-view-description', 'profile-view-socials', 'follow-button', 'common-followers-section',
-        'common-followers-list', 'profile-view-tabs', 'profile-comments-tab', 'profile-mentions-tab',
-        'mentions-container', 'connect-wallet-button', 'new-comment-area', 'new-comment-content',
-        'new-comment-channel-id', 'submit-new-comment-button', 'post-status-message'
+        "refresh-button",
+        "comments-container",
+        "logo",
+        "burger-menu-button",
+        "channel-menu",
+        "user-profile",
+        "profile-avatar",
+        "profile-name",
+        "logout-popup",
+        "logout-button",
+        "profile-view-header",
+        "profile-view-avatar",
+        "profile-view-name",
+        "back-to-comments-button",
+        "profile-view-stats",
+        "profile-followers",
+        "profile-following",
+        "profile-follow-state",
+        "profile-view-description",
+        "profile-view-socials",
+        "follow-button",
+        "common-followers-section",
+        "common-followers-list",
+        "profile-view-tabs",
+        "profile-comments-tab",
+        "profile-mentions-tab",
+        "mentions-container",
+        "connect-wallet-button",
+        "new-comment-area",
+        "new-comment-content",
+        "new-comment-channel-id",
+        "submit-new-comment-button",
+        "post-status-message",
     ];
-    elementIds.forEach(id => {
+    elementIds.forEach((id) => {
         const camelCaseId = id.replace(/-(\w)/g, (_, c) => c.toUpperCase());
         dom[camelCaseId] = document.getElementById(id);
     });
 
     // Register wallet callbacks
     wallet.registerOnConnect(() => {
-        dom.connectWalletButton.classList.add('hidden');
-        dom.userProfile.classList.remove('hidden');
-        dom.profileName.textContent = formatAddress(wallet.getUserAddress(), dom.profileName);
+        dom.connectWalletButton.classList.add("hidden");
+        dom.userProfile.classList.remove("hidden");
+        dom.profileName.textContent = formatAddress(
+            wallet.getUserAddress(),
+            dom.profileName
+        );
         resolveAndApplyAvatar(wallet.getUserAddress(), dom.profileAvatar);
         updateNewCommentAreaVisibility();
         initializeCommentsView();
     });
     wallet.registerOnLogout(() => {
         hideUserProfile();
-        dom.connectWalletButton.classList.remove('hidden');
-        dom.userProfile.classList.add('hidden');
+        dom.connectWalletButton.classList.remove("hidden");
+        dom.userProfile.classList.add("hidden");
         updateNewCommentAreaVisibility();
         initializeCommentsView();
     });
@@ -638,36 +797,60 @@ export function init() {
     });
 
     // Setup event listeners
-    dom.refreshButton.addEventListener('click', initializeCommentsView);
-    dom.logo.addEventListener('click', () => {
+    dom.refreshButton.addEventListener("click", initializeCommentsView);
+    dom.logo.addEventListener("click", () => {
         hideUserProfile();
         handleChannelClick(null);
     });
-    dom.connectWalletButton.addEventListener('click', () => wallet.connectWallet(showPostStatus, dom.connectWalletButton));
-    dom.submitNewCommentButton.addEventListener('click', async () => {
+    dom.connectWalletButton.addEventListener("click", () =>
+        wallet.connectWallet(showPostStatus, dom.connectWalletButton)
+    );
+    dom.submitNewCommentButton.addEventListener("click", async () => {
         dom.submitNewCommentButton.disabled = true;
         try {
-            await wallet.submitEcpComment(dom.newCommentContent.value, dom.newCommentChannelId.value, null, dom.postStatusMessage, showPostStatus);
-            dom.newCommentContent.value = '';
-            dom.newCommentChannelId.value = '';
+            await wallet.submitEcpComment(
+                dom.newCommentContent.value,
+                dom.newCommentChannelId.value,
+                null,
+                dom.postStatusMessage,
+                showPostStatus
+            );
+            dom.newCommentContent.value = "";
+            dom.newCommentChannelId.value = "";
         } catch {}
         dom.submitNewCommentButton.disabled = false;
     });
-    dom.backToCommentsButton.addEventListener('click', hideUserProfile);
-    dom.userProfile.addEventListener('click', (e) => { e.stopPropagation(); dom.logoutPopup.classList.toggle('hidden'); });
-    dom.logoutButton.addEventListener('click', (e) => { e.stopPropagation(); wallet.logout(); });
-    window.addEventListener('click', () => dom.logoutPopup.classList.add('hidden'));
-    window.addEventListener('scroll', () => {
-        if (!isLoadingMore && hasNextPage && !currentProfileFilter && currentChannelFilter === null) {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+    dom.backToCommentsButton.addEventListener("click", hideUserProfile);
+    dom.userProfile.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dom.logoutPopup.classList.toggle("hidden");
+    });
+    dom.logoutButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        wallet.logout();
+    });
+    window.addEventListener("click", () =>
+        dom.logoutPopup.classList.add("hidden")
+    );
+    window.addEventListener("scroll", () => {
+        if (
+            !isLoadingMore &&
+            hasNextPage &&
+            !currentProfileFilter &&
+            currentChannelFilter === null
+        ) {
+            if (
+                window.innerHeight + window.scrollY >=
+                document.body.offsetHeight - 300
+            ) {
                 loadMoreComments();
             }
         }
     });
-    dom.burgerMenuButton.addEventListener('click', () => {
-        const isOpen = dom.channelMenu.classList.toggle('open');
-        dom.burgerMenuButton.classList.toggle('open');
-        document.body.classList.toggle('menu-open-overlay', isOpen);
+    dom.burgerMenuButton.addEventListener("click", () => {
+        const isOpen = dom.channelMenu.classList.toggle("open");
+        dom.burgerMenuButton.classList.toggle("open");
+        document.body.classList.toggle("menu-open-overlay", isOpen);
     });
 
     // Initial calls
