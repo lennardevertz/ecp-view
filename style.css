@@ -231,6 +231,23 @@ main {
     text-decoration: underline;
 }
 
+.toggle-content-button {
+    background-color: transparent;
+    color: #3498db;
+    border: none;
+    padding: 4px 0;
+    font-size: 0.8em;
+    cursor: pointer;
+    margin-top: 5px;
+    display: block;
+    transition: color 0.2s;
+}
+
+.toggle-content-button:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
 a {
     color: #2980b9;
     text-decoration: none;
@@ -906,4 +923,13 @@ a:hover {
         /* font-size: 0.8em; /* Optionally reduce font size */
         /* padding: 6px 10px; /* Optionally reduce padding */
     }
+}
+
+.embedded-image {
+    max-width: 100%;
+    max-height: 400px; /* Optional: prevent very tall images */
+    border-radius: 8px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    display: block; /* Ensures margin-top works correctly */
 }

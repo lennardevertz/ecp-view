@@ -93,6 +93,11 @@ let ensDetailsCache = new Map();
 let followStateCache = new Map();
 let commonFollowersCache = new Map();
 let currentProfileFilter = null; // Add this for the new view
+let currentCursor = null;
+let hasNextPage = true;
+let isLoadingMore = false;
+const COMMENT_FETCH_LIMIT = 50;
+const MAX_COMMENT_LENGTH = 600;
 
 document.addEventListener("DOMContentLoaded", () => {
     const refreshButton = document.getElementById("refresh-button");
@@ -157,21 +162,25 @@ document.addEventListener("DOMContentLoaded", () => {
     discoverEIP6963Providers(); // Call this early
 
     const ECP_API_URL = "https://api.ethcomments.xyz/";
-    const COMMENTS_QUERY = `query MyQuery {
-        comments(limit: 100) {
-            items {
-                id
-                app
-                author
-                channelId
-                commentType
-                content
-                createdAt
-                parentId
-                txHash
-            }
+    const COMMENTS_QUERY = `query PaginatedComments($limit: Int, $after: String) {
+    comments(limit: $limit, after: $after, orderBy: "createdAt", orderDirection: "desc") {
+        items {
+            id
+            app
+            author
+            channelId
+            commentType
+            content
+            createdAt
+            parentId
+            txHash
         }
-    }`;
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+    }
+}`;
 
     function storeProvider(providerDetail) {
         const existingProvider = eip6963Providers.find(
@@ -775,7 +784,54 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- Add this new function ---
+    // --- END: New functions for enhanced profile data ---
+
+    async function loadMoreComments() {
+        if (!hasNextPage || isLoadingMore) return;
+
+        isLoadingMore = true;
+        if (refreshButton) {
+            refreshButton.classList.add("loading");
+            refreshButton.disabled = true;
+        }
+
+        try {
+            const { items: newRawComments, pageInfo } = await fetchComments(currentCursor);
+
+            if (newRawComments && newRawComments.length > 0) {
+                const { contentComments: newContentComments, likeCounts: newLikeCounts, likerLists: newLikerLists } = processCommentsAndLikes(newRawComments);
+
+                // Merge new like data into global stores
+                newLikeCounts.forEach((value, key) => window.currentLikeCounts.set(key, value));
+                newLikerLists.forEach((value, key) => window.likerLists.set(key, value));
+
+                // Append new comments to the main data array
+                allFetchedComments.push(...newContentComments);
+
+                // Update pagination state
+                currentCursor = pageInfo.endCursor;
+                hasNextPage = pageInfo.hasNextPage;
+
+                // Render and append only the new top-level comments to the UI
+                const newCommentTree = buildCommentTree(newContentComments);
+                newCommentTree.forEach((comment) => {
+                    commentsContainer.appendChild(renderComment(comment));
+                });
+            } else {
+                hasNextPage = false;
+            }
+        } catch (error) {
+            console.error("Error loading more comments:", error);
+            // Optionally show a message to the user
+        } finally {
+            isLoadingMore = false;
+            if (refreshButton) {
+                refreshButton.classList.remove("loading");
+                refreshButton.disabled = false;
+            }
+        }
+    }
+
     function displayProfileMentions() {
         if (!currentProfileFilter) return;
 
@@ -800,8 +856,6 @@ document.addEventListener("DOMContentLoaded", () => {
             mentionsContainer.innerHTML = `<p class="no-comments-message">No mentions found for this user.</p>`;
         }
     }
-
-    // --- END: New functions for enhanced profile data ---
 
     function updateNewCommentAreaVisibility() {
         if (!newCommentArea) return;
@@ -882,6 +936,8 @@ document.addEventListener("DOMContentLoaded", () => {
         updateNewCommentAreaVisibility();
     }
 
+
+
     function hideUserProfile() {
         currentProfileFilter = null;
         if (profileViewHeader) {
@@ -933,7 +989,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return {contentComments, likeCounts, likerLists};
     }
 
-    async function fetchComments() {
+    async function fetchComments(cursor = null) {
         try {
             const response = await fetch(ECP_API_URL, {
                 method: "POST",
@@ -941,7 +997,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     "Content-Type": "application/json",
                     Accept: "application/json",
                 },
-                body: JSON.stringify({query: COMMENTS_QUERY}),
+                body: JSON.stringify({
+                    query: COMMENTS_QUERY,
+                    variables: { limit: COMMENT_FETCH_LIMIT, after: cursor }
+                }),
             });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -955,7 +1014,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         .join(", ")}`
                 );
             }
-            return result.data.comments.items || [];
+            return result.data.comments || { items: [], pageInfo: { hasNextPage: false, endCursor: null } };
         } catch (error) {
             console.error("Error fetching comments:", error);
             throw error;
@@ -1120,6 +1179,87 @@ document.addEventListener("DOMContentLoaded", () => {
         return new Date(parseInt(timestamp)).toLocaleString(undefined, options);
     }
 
+    function renderContentWithEmbeds(content) {
+        const fragment = document.createDocumentFragment();
+
+        // Regex to find a URL OR a mention. Capture groups are key.
+        // Group 1: Full URL
+        // Group 2: Full Mention (e.g., @0x123...)
+        // Group 3: Mentioned Address (e.g., 0x123...)
+        const combinedRegex = /(https?:\/\/[^\s]+)|(@(0x[a-fA-F0-9]{40}))/gi;
+
+        // Regex to check if a URL is an image
+        const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
+
+        let lastIndex = 0;
+        let match;
+
+        while ((match = combinedRegex.exec(content)) !== null) {
+            // 1. Append any plain text before the match
+            if (match.index > lastIndex) {
+                fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.index)));
+            }
+
+            const urlMatch = match[1];
+            const mentionAddress = match[3];
+
+            if (urlMatch) {
+                // It's a URL
+                if (imageRegex.test(urlMatch)) {
+                    // It's an image URL: create an embed
+                    const link = document.createElement('a');
+                    link.href = urlMatch;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.title = 'View full-size image';
+
+                    const image = document.createElement('img');
+                    image.src = urlMatch;
+                    image.alt = 'User-posted image';
+                    image.classList.add('embedded-image');
+                    link.appendChild(image);
+                    fragment.appendChild(link);
+                } else {
+                    // It's a regular link
+                    const link = document.createElement('a');
+                    link.href = urlMatch;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = urlMatch.length > 50 ? urlMatch.substring(0, 47) + '...' : urlMatch;
+                    link.title = urlMatch;
+                    fragment.appendChild(link);
+                }
+            } else if (mentionAddress) {
+                // It's a mention
+                const mentionLink = document.createElement("a");
+                mentionLink.href = "#";
+                mentionLink.classList.add("mention-link");
+
+                const nameHolder = document.createElement("span");
+                nameHolder.textContent = formatAddress(mentionAddress, nameHolder);
+
+                mentionLink.appendChild(document.createTextNode("@"));
+                mentionLink.appendChild(nameHolder);
+
+                mentionLink.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showUserProfile(mentionAddress);
+                };
+                fragment.appendChild(mentionLink);
+            }
+
+            lastIndex = combinedRegex.lastIndex;
+        }
+
+        // 3. Append any remaining plain text after the last match
+        if (lastIndex < content.length) {
+            fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
+        }
+
+        return fragment;
+    }
+
     function renderComment(comment, depth = 0) {
         const commentDiv = document.createElement("div");
         commentDiv.classList.add("comment");
@@ -1185,63 +1325,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const contentP = document.createElement("p");
         contentP.classList.add("comment-content");
-        contentP.innerHTML = ""; // Clear existing content
-        const content = comment.content;
-        const mentionRegex = /(@(0x[a-fA-F0-9]{40}))/gi;
-        let lastIndex = 0;
-        let match;
-        const fragment = document.createDocumentFragment();
 
-        while ((match = mentionRegex.exec(content)) !== null) {
-            // Append text before the mention
-            if (match.index > lastIndex) {
-                fragment.appendChild(
-                    document.createTextNode(
-                        content.substring(lastIndex, match.index)
-                    )
-                );
-            }
+        // Handle collapsible long comments
+        if (comment.content.length > MAX_COMMENT_LENGTH) {
+            const truncatedContent = comment.content.substring(0, MAX_COMMENT_LENGTH) + '...';
 
-            const mentionedAddress = match[2]; // The address part (0x...)
+            // Initial state: show truncated content
+            contentP.appendChild(renderContentWithEmbeds(truncatedContent));
+            commentDiv.appendChild(contentP);
 
-            const mentionLink = document.createElement("a");
-            mentionLink.href = "#";
-            mentionLink.classList.add("mention-link");
+            const toggleButton = document.createElement('button');
+            toggleButton.classList.add('toggle-content-button');
+            toggleButton.textContent = 'Show more';
+            
+            let isExpanded = false;
 
-            // Use a span for the name to allow async ENS updates without affecting the '@'
-            const nameHolder = document.createElement("span");
-            nameHolder.textContent = formatAddress(
-                mentionedAddress,
-                nameHolder
-            );
+            toggleButton.onclick = () => {
+                isExpanded = !isExpanded;
+                contentP.innerHTML = ''; // Clear current content
 
-            mentionLink.appendChild(document.createTextNode("@"));
-            mentionLink.appendChild(nameHolder);
-
-            mentionLink.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent comment-level clicks from firing
-                showUserProfile(mentionedAddress);
+                if (isExpanded) {
+                    contentP.appendChild(renderContentWithEmbeds(comment.content));
+                    toggleButton.textContent = 'Show less';
+                } else {
+                    contentP.appendChild(renderContentWithEmbeds(truncatedContent));
+                    toggleButton.textContent = 'Show more';
+                }
             };
 
-            fragment.appendChild(mentionLink);
-            lastIndex = mentionRegex.lastIndex;
-        }
+            // Insert the button right after the content paragraph
+            commentDiv.appendChild(toggleButton);
 
-        // Append any remaining text after the last mention
-        if (lastIndex < content.length) {
-            fragment.appendChild(
-                document.createTextNode(content.substring(lastIndex))
-            );
-        }
-
-        // If no mentions were found, the fragment will be empty.
-        if (lastIndex === 0) {
-            contentP.textContent = content;
         } else {
-            contentP.appendChild(fragment);
+            // Standard logic for short comments
+            contentP.appendChild(renderContentWithEmbeds(comment.content));
+            commentDiv.appendChild(contentP);
         }
-        commentDiv.appendChild(contentP);
 
         if (comment.channelId && String(comment.channelId) !== "0") {
             const channelDisplayDiv = document.createElement("div");
@@ -1609,61 +1728,64 @@ document.addEventListener("DOMContentLoaded", () => {
         if (wasInitialLoad) {
             showLoadingMessage(); // Clears commentsContainer and shows "Loading comments..."
         } else {
-            // For background refresh, provide a subtle loading indicator
             if (refreshButton) {
                 refreshButton.classList.add("loading");
                 refreshButton.disabled = true;
             }
-            // Do NOT call the global showLoadingMessage() here for background refreshes.
-            // displayFilteredComments will handle clearing and re-rendering the comment list.
         }
 
+        // Reset all state for a full refresh
+        currentCursor = null;
+        hasNextPage = true;
+        isLoadingMore = false;
+        allFetchedComments = [];
+        window.currentLikeCounts.clear();
+        window.likerLists.clear();
+
+
         try {
-            const fetchedComments = await fetchComments();
-            const rawFetchedComments = fetchedComments || [];
+            const { items: rawFetchedComments, pageInfo } = await fetchComments();
 
             const {contentComments, likeCounts, likerLists} =
-                processCommentsAndLikes(rawFetchedComments);
+                processCommentsAndLikes(rawFetchedComments || []);
             window.currentLikeCounts = likeCounts;
             window.likerLists = likerLists; // Store the new data
-            allFetchedComments = contentComments; // This now holds only displayable comments
+            allFetchedComments = contentComments; // This now holds only the first page of comments
+
+            // Set pagination state from the first fetch
+            currentCursor = pageInfo.endCursor;
+            hasNextPage = pageInfo.hasNextPage;
 
             if (allFetchedComments.length === 0) {
-                // No content comments to display after processing.
-                // Determine the appropriate message.
                 const message =
-                    rawFetchedComments.length > 0
+                    (rawFetchedComments && rawFetchedComments.length > 0)
                         ? "No displayable comments found (all items might be reactions or other types)."
                         : "No comments found.";
-                showNoCommentsMessage(message); // This function clears commentsContainer.
-                renderChannelMenu(); // Always render the menu.
+                showNoCommentsMessage(message);
+                renderChannelMenu();
                 if (wasInitialLoad) {
-                    isInitialLoad = false; // Mark initial load as done.
+                    isInitialLoad = false;
                 }
-                // Finalize button state for background refresh if it was one
                 if (!wasInitialLoad && refreshButton) {
                     refreshButton.classList.remove("loading");
                     refreshButton.disabled = false;
                 }
-                return; // Exit early as there's nothing to display via displayFilteredComments.
+                return;
             }
 
-            // If we have content comments, displayFilteredComments will handle rendering.
-            // displayFilteredComments clears commentsContainer and then renders or shows "no comments for filter".
             displayFilteredComments(currentChannelFilter);
 
             if (wasInitialLoad) {
-                isInitialLoad = false; // Mark initial load as done after successful display.
+                isInitialLoad = false;
             }
         } catch (error) {
-            allFetchedComments = []; // Reset on error
+            allFetchedComments = [];
             window.currentLikeCounts.clear();
-            window.likerLists.clear(); // Also clear this
+            window.likerLists.clear();
 
             if (wasInitialLoad) {
                 showErrorMessage(`Failed to load comments: ${error.message}`);
             } else {
-                // For background refresh errors, log and optionally show a non-intrusive message.
                 console.error("Background refresh failed:", error);
                 if (postStatusMessage)
                     showPostStatus(
@@ -1671,16 +1793,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         true,
                         postStatusMessage
                     );
-                // Do not clear existing comments on background refresh failure.
             }
-            renderChannelMenu(); // Still attempt to render menu.
+            renderChannelMenu();
         } finally {
-            // Re-enable refresh button if it was a background refresh.
             if (!wasInitialLoad && refreshButton) {
                 refreshButton.classList.remove("loading");
                 refreshButton.disabled = false;
             }
-            // If it was an initial load, the refresh button wasn't in a "Refreshing..." state.
         }
     }
 
@@ -1736,6 +1855,19 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("click", () => {
         if (logoutPopup && !logoutPopup.classList.contains("hidden")) {
             logoutPopup.classList.add("hidden");
+        }
+    });
+
+    window.addEventListener("scroll", () => {
+        if (isLoadingMore || !hasNextPage) return;
+
+        // Trigger when user is near the bottom of the page
+        const buffer = 300; // Load 300px before hitting the bottom
+        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - buffer) {
+            // Only trigger infinite scroll on the main feed (no profile or channel filters)
+            if (!currentProfileFilter && currentChannelFilter === null) {
+                loadMoreComments();
+            }
         }
     });
 
