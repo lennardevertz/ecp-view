@@ -1,41 +1,285 @@
 // js/ui/commentRenderer.js
 
-import { MAX_COMMENT_LENGTH, ensProvider } from '../constants.js';
+import {
+    MAX_COMMENT_LENGTH,
+    ensProvider,
+    MINIMAL_ERC20_ABI,
+    MINIMAL_ERC721_ABI,
+} from "../constants.js";
+
+const tokenInfoCache = new Map();
+const providerCache = new Map();
+const coinGeckoIdCache = new Map();
+
+// ADD THIS HELPER FUNCTION
+let sharedChartTooltip = null;
+function getSharedChartTooltip() {
+    if (!sharedChartTooltip) {
+        sharedChartTooltip = document.createElement("div");
+        sharedChartTooltip.classList.add("coingecko-chart-tooltip");
+        document.body.appendChild(sharedChartTooltip);
+    }
+    return sharedChartTooltip;
+}
+
+function createCaip19Embed(caip19String) {
+    const embed = document.createElement("a");
+    embed.classList.add("caip19-embed");
+    embed.target = "_blank";
+    embed.rel = "noopener noreferrer";
+
+    const icon = document.createElement("div");
+    icon.classList.add("caip19-icon");
+
+    const infoDiv = document.createElement("div");
+    infoDiv.classList.add("caip19-info");
+
+    const nameSpan = document.createElement("span");
+    nameSpan.classList.add("caip19-name");
+
+    const symbolSpan = document.createElement("span");
+    symbolSpan.classList.add("caip19-symbol");
+
+    infoDiv.append(nameSpan, symbolSpan);
+    embed.append(icon, infoDiv);
+
+    const fetchTokenData = async () => {
+        try {
+            const [chainInfo, assetInfo] = caip19String.split("/");
+            const [assetNamespace, assetReference] = assetInfo.split(":");
+            const [chainNamespace, chainId] = chainInfo.split(":");
+            const [contractAddress, tokenId] = assetReference.split("/");
+
+            if (chainNamespace !== "eip155") return;
+
+            const explorerUrl =
+                chainId === "8453"
+                    ? `https://basescan.org/token/${contractAddress}`
+                    : `https://etherscan.io/token/${contractAddress}`;
+            embed.href = tokenId ? `${explorerUrl}?a=${tokenId}` : explorerUrl;
+
+            const cacheKey = `${chainId}:${contractAddress}`;
+            if (tokenInfoCache.has(cacheKey)) {
+                const {name, symbol, logo} = tokenInfoCache.get(cacheKey);
+                nameSpan.textContent = name;
+                symbolSpan.textContent = symbol;
+                if (logo) icon.style.backgroundImage = `url('${logo}')`;
+                return;
+            }
+
+            nameSpan.textContent = `${assetNamespace.toUpperCase()} Token`;
+            symbolSpan.textContent = `${contractAddress.substring(0, 6)}...`;
+
+            if (!providerCache.has(chainId)) {
+                const rpcUrl =
+                    chainId === "8453"
+                        ? "https://base.llamarpc.com"
+                        : "https://ethereum-rpc.publicnode.com";
+                providerCache.set(
+                    chainId,
+                    new window.ethers.providers.JsonRpcProvider(rpcUrl)
+                );
+            }
+            const provider = providerCache.get(chainId);
+
+            if (assetNamespace === "erc20") {
+                const contract = new window.ethers.Contract(
+                    contractAddress,
+                    MINIMAL_ERC20_ABI,
+                    provider
+                );
+                const [name, symbol] = await Promise.all([
+                    contract.name(),
+                    contract.symbol(),
+                ]);
+
+                const checksumAddress =
+                    window.ethers.utils.getAddress(contractAddress);
+                const chainNameForLogo =
+                    chainId === "8453" ? "base" : "ethereum";
+                const logo = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${chainNameForLogo}/assets/${checksumAddress}/logo.png`;
+
+                nameSpan.textContent = name;
+                symbolSpan.textContent = symbol;
+                icon.style.backgroundImage = `url('${logo}')`;
+
+                tokenInfoCache.set(cacheKey, {name, symbol, logo});
+            }
+        } catch (error) {
+            console.warn(`Failed to fetch info for ${caip19String}:`, error);
+            nameSpan.textContent = "Unknown Token";
+        }
+    };
+
+    fetchTokenData();
+
+    // --- Logic for shared, robustly positioned tooltip ---
+    let hideTooltipTimeout;
+
+    const positionTooltip = () => {
+        const tooltip = getSharedChartTooltip();
+        if (tooltip.style.display !== "block") return;
+
+        const rect = embed.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const buffer = 10; // Screen edge buffer
+
+        // Vertical position: Prefer above, but move below if not enough space.
+        // NO GAP when positioning above to prevent flickering.
+        let top = rect.top - tooltipRect.height;
+        if (top < buffer) {
+            // Add a small gap when positioning below.
+            top = rect.bottom + 5;
+        }
+
+        // Horizontal position: Center it, but keep it on-screen.
+        let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+        if (left < buffer) {
+            left = buffer;
+        }
+        if (left + tooltipRect.width > window.innerWidth - buffer) {
+            left = window.innerWidth - tooltipRect.width - buffer;
+        }
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.opacity = "1";
+    };
+
+    embed.addEventListener("mouseenter", async () => {
+        clearTimeout(hideTooltipTimeout);
+        const tooltip = getSharedChartTooltip();
+
+        tooltip.style.opacity = "0";
+        tooltip.style.display = "block";
+        tooltip.style.top = "-9999px";
+
+        if (tooltip.dataset.renderedFor === caip19String) {
+            requestAnimationFrame(positionTooltip);
+            return;
+        }
+
+        tooltip.innerHTML = `<p class="loading-message">Loading chart...</p>`;
+
+        try {
+            const [chainInfo, assetInfo] = caip19String.split("/");
+            const [_, assetReference] = assetInfo.split(":");
+            const [chainNamespace, chainId] = chainInfo.split(":");
+            const [contractAddress] = assetReference.split("/");
+
+            if (chainNamespace !== "eip155")
+                throw new Error("Not an EVM chain");
+
+            const cacheKey = `${chainId}:${contractAddress}`;
+            let coinId = coinGeckoIdCache.get(cacheKey);
+
+            if (coinId === undefined) {
+                const platformId = chainId === "8453" ? "base" : "ethereum";
+                const response = await fetch(
+                    `https://api.coingecko.com/api/v3/coins/${platformId}/contract/${contractAddress}`
+                );
+                if (!response.ok)
+                    throw new Error("Token not found on CoinGecko");
+                const data = await response.json();
+                coinId = data.id;
+                coinGeckoIdCache.set(cacheKey, coinId);
+            }
+
+            if (coinId) {
+                tooltip.innerHTML = "";
+                const chartWidget = document.createElement(
+                    "gecko-coin-price-chart-widget"
+                );
+                chartWidget.setAttribute("coin-id", coinId);
+                chartWidget.setAttribute("locale", "en");
+                chartWidget.setAttribute("transparent-background", "true");
+                chartWidget.setAttribute("outlined", "false"); // Set to false
+                tooltip.appendChild(chartWidget);
+                tooltip.dataset.renderedFor = caip19String;
+
+                setTimeout(() => requestAnimationFrame(positionTooltip), 150);
+            } else {
+                throw new Error("CoinGecko ID not found");
+            }
+        } catch (error) {
+            console.warn(
+                `Could not load CoinGecko chart for ${caip19String}:`,
+                error
+            );
+            tooltip.innerHTML = `<p class="loading-message">Chart not available</p>`;
+            tooltip.dataset.renderedFor = caip19String;
+            requestAnimationFrame(positionTooltip);
+        }
+    });
+
+    const hideTooltip = () => {
+        const tooltip = getSharedChartTooltip();
+        hideTooltipTimeout = setTimeout(() => {
+            tooltip.style.opacity = "0";
+            setTimeout(() => {
+                tooltip.style.display = "none";
+                tooltip.dataset.renderedFor = "";
+            }, 150);
+        }, 100);
+    };
+
+    embed.addEventListener("mouseleave", hideTooltip);
+    getSharedChartTooltip().addEventListener("mouseenter", () =>
+        clearTimeout(hideTooltipTimeout)
+    );
+    getSharedChartTooltip().addEventListener("mouseleave", hideTooltip);
+
+    return embed;
+}
 
 function renderContentWithEmbeds(content, formatters, callbacks) {
-    const { formatAddress } = formatters;
-    const { onProfileClick } = callbacks;
+    const {formatAddress} = formatters;
+    const {onProfileClick} = callbacks;
     const fragment = document.createDocumentFragment();
-    
-    // Updated regex to also capture standalone .eth names
-    const combinedRegex = /(https?:\/\/[^\s]+)|(@(0x[a-fA-F0-9]{40}))|(\b[a-zA-Z0-9-]+\.eth\b)/gi;
-    
+
+    const combinedRegex =
+        /(https?:\/\/[^\s]+)|(@(0x[a-fA-F0-9]{40}))|(\b[a-zA-Z0-9-]+\.eth\b)|(eip155:\d+\/(?:erc20|erc721):0x[a-fA-F0-9]{40}(?:\/\d+)?)/gi;
+
     const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
+    const ipfsGatewayRegex =
+        /(gateway\.pinata\.cloud|[a-zA-Z0-9-]+\.mypinata\.cloud|ipfs\.io)/i;
+
     let lastIndex = 0;
     let match;
 
     while ((match = combinedRegex.exec(content)) !== null) {
         if (match.index > lastIndex) {
-            fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.index)));
+            fragment.appendChild(
+                document.createTextNode(
+                    content.substring(lastIndex, match.index)
+                )
+            );
         }
         const urlMatch = match[1];
         const mentionAddress = match[3];
-        const ensNameMatch = match[4]; // New capture group for .eth names
+        const ensNameMatch = match[4];
+        const caip19Match = match[5];
 
-        if (urlMatch) {
-            const link = document.createElement('a');
+        if (caip19Match) {
+            fragment.appendChild(createCaip19Embed(caip19Match));
+        } else if (urlMatch) {
+            const link = document.createElement("a");
             link.href = urlMatch;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            if (imageRegex.test(urlMatch)) {
-                link.title = 'View full-size image';
-                const image = document.createElement('img');
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+
+            if (imageRegex.test(urlMatch) || ipfsGatewayRegex.test(urlMatch)) {
+                link.title = "View full-size image";
+                const image = document.createElement("img");
                 image.src = urlMatch;
-                image.alt = 'User-posted image';
-                image.classList.add('embedded-image');
+                image.alt = "User-posted image";
+                image.classList.add("embedded-image");
                 link.appendChild(image);
             } else {
-                link.textContent = urlMatch.length > 50 ? urlMatch.substring(0, 47) + '...' : urlMatch;
+                link.textContent =
+                    urlMatch.length > 50
+                        ? urlMatch.substring(0, 47) + "..."
+                        : urlMatch;
                 link.title = urlMatch;
             }
             fragment.appendChild(link);
@@ -54,7 +298,6 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
             };
             fragment.appendChild(mentionLink);
         } else if (ensNameMatch) {
-            // Logic to handle clickable .eth names
             const ensLink = document.createElement("a");
             ensLink.href = "#";
             ensLink.classList.add("mention-link");
@@ -63,48 +306,53 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
             ensLink.onclick = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-
-                if (ensLink.dataset.resolving === 'true') return;
-                ensLink.dataset.resolving = 'true';
-                ensLink.style.cursor = 'wait';
-
+                if (ensLink.dataset.resolving === "true") return;
+                ensLink.dataset.resolving = "true";
+                ensLink.style.cursor = "wait";
                 try {
-                    const resolvedAddress = await ensProvider.resolveName(ensNameMatch);
+                    const resolvedAddress = await ensProvider.resolveName(
+                        ensNameMatch
+                    );
                     if (resolvedAddress) {
                         onProfileClick(resolvedAddress);
                     } else {
                         ensLink.title = `Could not resolve ${ensNameMatch}`;
-                        ensLink.style.textDecoration = 'line-through';
-                        ensLink.style.color = '#95a5a6';
-                        ensLink.onclick = (ev) => ev.preventDefault(); // Disable future clicks
+                        ensLink.style.textDecoration = "line-through";
+                        ensLink.style.color = "#95a5a6";
+                        ensLink.onclick = (ev) => ev.preventDefault();
                     }
                 } catch (error) {
-                    console.error(`Failed to resolve ENS name ${ensNameMatch}:`, error);
-                    ensLink.title = 'Error during resolution';
-                    ensLink.style.textDecoration = 'line-through';
-                    ensLink.style.color = '#e74c3c';
+                    console.error(
+                        `Failed to resolve ENS name ${ensNameMatch}:`,
+                        error
+                    );
+                    ensLink.title = "Error during resolution";
+                    ensLink.style.textDecoration = "line-through";
+                    ensLink.style.color = "#e74c3c";
                     ensLink.onclick = (ev) => ev.preventDefault();
                 } finally {
-                    ensLink.style.cursor = 'pointer';
+                    ensLink.style.cursor = "pointer";
                     delete ensLink.dataset.resolving;
                 }
             };
             fragment.appendChild(ensLink);
         }
-        
+
         lastIndex = combinedRegex.lastIndex;
     }
     if (lastIndex < content.length) {
-        fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
+        fragment.appendChild(
+            document.createTextNode(content.substring(lastIndex))
+        );
     }
     return fragment;
 }
 
 export function renderComment(comment, config) {
-    const { depth, state, formatters, callbacks } = config;
-    const { userAddress, isOnCorrectNetwork, likerLists } = state;
-    const { formatDate, formatAddress, resolveAndApplyAvatar } = formatters;
-    const { onProfileClick, onReply, onLike } = callbacks;
+    const {depth, state, formatters, callbacks} = config;
+    const {userAddress, isOnCorrectNetwork, likerLists} = state;
+    const {formatDate, formatAddress, resolveAndApplyAvatar} = formatters;
+    const {onProfileClick, onReply, onLike} = callbacks;
 
     const commentDiv = document.createElement("div");
     commentDiv.classList.add("comment");
@@ -153,27 +401,44 @@ export function renderComment(comment, config) {
     const contentP = document.createElement("p");
     contentP.classList.add("comment-content");
     if (comment.content.length > MAX_COMMENT_LENGTH) {
-        const truncatedContent = comment.content.substring(0, MAX_COMMENT_LENGTH) + '...';
-        contentP.appendChild(renderContentWithEmbeds(truncatedContent, formatters, callbacks));
+        const truncatedContent =
+            comment.content.substring(0, MAX_COMMENT_LENGTH) + "...";
+        contentP.appendChild(
+            renderContentWithEmbeds(truncatedContent, formatters, callbacks)
+        );
         commentDiv.appendChild(contentP);
-        const toggleButton = document.createElement('button');
-        toggleButton.classList.add('toggle-content-button');
-        toggleButton.textContent = 'Show more';
+        const toggleButton = document.createElement("button");
+        toggleButton.classList.add("toggle-content-button");
+        toggleButton.textContent = "Show more";
         let isExpanded = false;
         toggleButton.onclick = () => {
             isExpanded = !isExpanded;
-            contentP.innerHTML = '';
+            contentP.innerHTML = "";
             if (isExpanded) {
-                contentP.appendChild(renderContentWithEmbeds(comment.content, formatters, callbacks));
-                toggleButton.textContent = 'Show less';
+                contentP.appendChild(
+                    renderContentWithEmbeds(
+                        comment.content,
+                        formatters,
+                        callbacks
+                    )
+                );
+                toggleButton.textContent = "Show less";
             } else {
-                contentP.appendChild(renderContentWithEmbeds(truncatedContent, formatters, callbacks));
-                toggleButton.textContent = 'Show more';
+                contentP.appendChild(
+                    renderContentWithEmbeds(
+                        truncatedContent,
+                        formatters,
+                        callbacks
+                    )
+                );
+                toggleButton.textContent = "Show more";
             }
         };
         commentDiv.appendChild(toggleButton);
     } else {
-        contentP.appendChild(renderContentWithEmbeds(comment.content, formatters, callbacks));
+        contentP.appendChild(
+            renderContentWithEmbeds(comment.content, formatters, callbacks)
+        );
         commentDiv.appendChild(contentP);
     }
 
@@ -248,9 +513,15 @@ export function renderComment(comment, config) {
         commentDiv.appendChild(replyFormDiv);
 
         const replyTextarea = replyFormDiv.querySelector("textarea");
-        const submitReplyBtn = replyFormDiv.querySelector(".submit-reply-button");
-        const cancelReplyBtn = replyFormDiv.querySelector(".cancel-reply-button");
-        const replyStatusMsgElement = replyFormDiv.querySelector(".reply-status-message");
+        const submitReplyBtn = replyFormDiv.querySelector(
+            ".submit-reply-button"
+        );
+        const cancelReplyBtn = replyFormDiv.querySelector(
+            ".cancel-reply-button"
+        );
+        const replyStatusMsgElement = replyFormDiv.querySelector(
+            ".reply-status-message"
+        );
 
         replyButton.onclick = () => {
             const isVisible = replyFormDiv.style.display === "block";
@@ -265,7 +536,11 @@ export function renderComment(comment, config) {
         submitReplyBtn.onclick = async () => {
             submitReplyBtn.disabled = true;
             cancelReplyBtn.disabled = true;
-            const success = await onReply(comment, replyTextarea.value, replyStatusMsgElement);
+            const success = await onReply(
+                comment,
+                replyTextarea.value,
+                replyStatusMsgElement
+            );
             if (success) {
                 replyTextarea.value = "";
                 replyFormDiv.style.display = "none";
@@ -286,13 +561,15 @@ export function renderComment(comment, config) {
         const childrenContainer = document.createElement("div");
         childrenContainer.classList.add("comment-children");
         comment.children.forEach((reply) => {
-            const childConfig = { ...config, depth: depth + 1 };
+            const childConfig = {...config, depth: depth + 1};
             childrenContainer.appendChild(renderComment(reply, childConfig));
         });
         commentDiv.appendChild(childrenContainer);
         toggleButton.onclick = () => {
             const isHidden = childrenContainer.classList.toggle("hidden");
-            toggleButton.textContent = isHidden ? `[+] Show Replies (${comment.children.length})` : `[-] Hide Replies (${comment.children.length})`;
+            toggleButton.textContent = isHidden
+                ? `[+] Show Replies (${comment.children.length})`
+                : `[-] Hide Replies (${comment.children.length})`;
         };
     }
     return commentDiv;

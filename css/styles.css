@@ -933,3 +933,82 @@ a:hover {
     border: 1px solid #ddd;
     display: block; /* Ensures margin-top works correctly */
 }
+
+/* CAIP-19 Token Embed Styles */
+.caip19-embed {
+    display: inline-flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    padding: 4px 10px 4px 4px;
+    margin: 2px;
+    text-decoration: none;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    max-width: 100%;
+}
+
+.caip19-embed:hover {
+    background-color: #e9ecef;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    text-decoration: none;
+}
+
+.caip19-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    margin-right: 8px;
+    background-color: #ced4da; /* Placeholder color */
+    flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+.caip19-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.caip19-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.caip19-symbol {
+    font-size: 0.8em;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* CoinGecko Chart Tooltip Styles */
+.coingecko-chart-tooltip {
+    display: none; /* Hidden by default */
+    position: fixed; /* Position relative to the viewport */
+    z-index: 1020;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    transition: opacity 0.15s ease-in-out;
+    box-sizing: border-box;
+    width: 500px; /* Set the desired width */
+}
+
+.coingecko-chart-tooltip .loading-message {
+    font-size: 0.9em;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}

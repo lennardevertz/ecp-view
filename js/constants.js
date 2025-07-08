@@ -101,3 +101,14 @@ export const MAX_COMMENT_LENGTH = 300;
 export const ensProvider = new window.ethers.providers.JsonRpcProvider(
     ETH_MAINNET_RPC_URL
 );
+
+// Minimal ABIs for fetching token info
+export const MINIMAL_ERC20_ABI = [
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+];
+
+export const MINIMAL_ERC721_ABI = [
+    "function name() view returns (string)",
+    "function tokenURI(uint256 tokenId) view returns (string)",
+];
