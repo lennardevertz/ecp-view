@@ -158,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const ECP_API_URL = "https://api.ethcomments.xyz/";
     const COMMENTS_QUERY = `query MyQuery {
-        comments {
+        comments(limit: 100) {
             items {
                 id
                 app
@@ -962,8 +962,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    const sortByDate = (a, b) =>
-        parseInt(b.createdAt) - parseInt(a.createdAt);
+    const sortByDate = (a, b) => parseInt(b.createdAt) - parseInt(a.createdAt);
 
     function buildCommentTree(comments) {
         const commentMap = new Map();
@@ -1197,7 +1196,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Append text before the mention
             if (match.index > lastIndex) {
                 fragment.appendChild(
-                    document.createTextNode(content.substring(lastIndex, match.index))
+                    document.createTextNode(
+                        content.substring(lastIndex, match.index)
+                    )
                 );
             }
 
@@ -1209,7 +1210,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Use a span for the name to allow async ENS updates without affecting the '@'
             const nameHolder = document.createElement("span");
-            nameHolder.textContent = formatAddress(mentionedAddress, nameHolder);
+            nameHolder.textContent = formatAddress(
+                mentionedAddress,
+                nameHolder
+            );
 
             mentionLink.appendChild(document.createTextNode("@"));
             mentionLink.appendChild(nameHolder);
