@@ -76,25 +76,49 @@ export const REACTION_CONTENT_LIKE = "like";
 // API and UI Configuration
 export const ECP_API_URL = "https://api.ethcomments.xyz/";
 export const COMMENTS_QUERY = `query PaginatedComments($limit: Int, $after: String) {
-    comments(limit: $limit, after: $after, orderBy: "createdAt", orderDirection: "desc") {
+  comments(
+    limit: $limit
+    after: $after
+    orderBy: "createdAt"
+    orderDirection: "desc"
+    where: {parentId: null}
+  ) {
+    items {
+      id
+      app
+      author
+      channelId
+      commentType
+      content
+      createdAt
+      parentId
+      txHash
+      reactionCounts
+      replies {
+        totalCount
+      }
+      flatReplies {
         items {
-            id
-            app
-            author
-            channelId
-            commentType
-            content
-            createdAt
-            parentId
-            txHash
+          id
+          app
+          author
+          channelId
+          commentType
+          content
+          createdAt
+          parentId
+          txHash
+          reactionCounts
         }
-        pageInfo {
-            hasNextPage
-            endCursor
-        }
+      }
     }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
 }`;
-export const COMMENT_FETCH_LIMIT = 100;
+export const COMMENT_FETCH_LIMIT = 50;
 export const MAX_COMMENT_LENGTH = 300;
 
 // ENS Provider (can be shared)
@@ -112,3 +136,53 @@ export const MINIMAL_ERC721_ABI = [
     "function name() view returns (string)",
     "function tokenURI(uint256 tokenId) view returns (string)",
 ];
+
+export const COMMENTS_BY_AUTHOR_QUERY = `query PaginatedCommentsByAuthor($author: String!, $limit: Int, $after: String) {
+  comments(
+    limit: $limit
+    after: $after
+    orderBy: "createdAt"
+    orderDirection: "desc"
+    where: {author_contains: $author}
+  ) {
+    items {
+      id
+      app
+      author
+      channelId
+      commentType
+      content
+      createdAt
+      parentId
+      txHash
+      reactionCounts
+      replies {
+        totalCount
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}`;
+
+export const COMMENTS_BY_IDS_QUERY = `query CommentsByIds($ids: [String!]) {
+  comments(where: {id_in: $ids}) {
+    items {
+      id
+      app
+      author
+      channelId
+      commentType
+      content
+      createdAt
+      parentId
+      txHash
+      reactionCounts
+      replies {
+        totalCount
+      }
+    }
+  }
+}`;

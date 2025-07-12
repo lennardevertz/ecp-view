@@ -350,7 +350,7 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
 
 export function renderComment(comment, config) {
     const {depth, state, formatters, callbacks} = config;
-    const {userAddress, isOnCorrectNetwork, likerLists} = state;
+    const {userAddress, isOnCorrectNetwork} = state;
     const {formatDate, formatAddress, resolveAndApplyAvatar} = formatters;
     const {onProfileClick, onReply, onLike} = callbacks;
 
@@ -462,25 +462,11 @@ export function renderComment(comment, config) {
     // Actions (Like, Reply)
     const likeSectionDiv = document.createElement("div");
     likeSectionDiv.classList.add("like-section");
-    const likers = likerLists.get(comment.id) || new Set();
-    const tooltipContainer = document.createElement("div");
-    tooltipContainer.classList.add("like-tooltip-container");
+    const likeCount = comment.reactionCounts?.like || 0;
     const likeCountSpan = document.createElement("span");
     likeCountSpan.classList.add("like-count");
-    likeCountSpan.innerHTML = `<img src="https://www.cryptologos.cc/logos/ethereum-eth-logo.svg?v=040" alt="Likes" class="like-icon"> ${likers.size}`;
-    tooltipContainer.appendChild(likeCountSpan);
-    if (likers.size > 0) {
-        const tooltip = document.createElement("div");
-        tooltip.classList.add("like-tooltip");
-        likers.forEach((likerAddress) => {
-            const likerDiv = document.createElement("div");
-            likerDiv.classList.add("tooltip-liker");
-            likerDiv.textContent = formatAddress(likerAddress, likerDiv);
-            tooltip.appendChild(likerDiv);
-        });
-        tooltipContainer.appendChild(tooltip);
-    }
-    likeSectionDiv.appendChild(tooltipContainer);
+    likeCountSpan.innerHTML = `<img src="https://www.cryptologos.cc/logos/ethereum-eth-logo.svg?v=040" alt="Likes" class="like-icon"> ${likeCount}`;
+    likeSectionDiv.appendChild(likeCountSpan);
 
     if (userAddress && isOnCorrectNetwork) {
         const likeButton = document.createElement("button");
@@ -553,23 +539,73 @@ export function renderComment(comment, config) {
     commentDiv.appendChild(likeSectionDiv);
 
     // Children
-    if (comment.children && comment.children.length > 0) {
+    if (
+        comment.contentReplyCount > 0 &&
+        comment.children &&
+        comment.children.length > 0
+    ) {
+        // Main toggle button for showing/hiding the entire replies section
         const toggleButton = document.createElement("button");
         toggleButton.classList.add("toggle-replies");
-        toggleButton.textContent = `[-] Hide Replies (${comment.children.length})`;
+        toggleButton.textContent = `[-] Hide Replies (${comment.contentReplyCount})`;
         commentDiv.appendChild(toggleButton);
+
+        // Container for all children elements, visible by default
         const childrenContainer = document.createElement("div");
         childrenContainer.classList.add("comment-children");
-        comment.children.forEach((reply) => {
-            const childConfig = {...config, depth: depth + 1};
-            childrenContainer.appendChild(renderComment(reply, childConfig));
-        });
         commentDiv.appendChild(childrenContainer);
+
+        // --- Progressive Rendering Logic ---
+
+        // 1. Render and display the first reply immediately.
+        const firstReply = comment.children[0];
+        const firstReplyConfig = {...config, depth: depth + 1};
+        childrenContainer.appendChild(renderComment(firstReply, firstReplyConfig));
+
+        const remainingReplies = comment.children.slice(1);
+
+        // 2. If there are more replies, add a "Show more/less" button.
+        if (remainingReplies.length > 0) {
+            const showMoreButton = document.createElement("button");
+            showMoreButton.classList.add("toggle-replies", "show-more-replies");
+            showMoreButton.textContent = `[+] Show ${remainingReplies.length} more replies`;
+            childrenContainer.appendChild(showMoreButton);
+
+            let areExtraRepliesRendered = false;
+            let extraRepliesContainer = null;
+
+            showMoreButton.onclick = (e) => {
+                e.stopPropagation(); // Prevent the main toggle from firing
+
+                if (!areExtraRepliesRendered) {
+                    // First click: create container and render replies
+                    extraRepliesContainer = document.createElement("div");
+                    extraRepliesContainer.classList.add("extra-replies-container");
+                    
+                    remainingReplies.forEach((reply) => {
+                        const replyConfig = {...config, depth: depth + 1};
+                        extraRepliesContainer.appendChild(renderComment(reply, replyConfig));
+                    });
+                    
+                    childrenContainer.insertBefore(extraRepliesContainer, showMoreButton);
+                    areExtraRepliesRendered = true;
+                    showMoreButton.textContent = `[-] Show less`;
+                } else {
+                    // Subsequent clicks: toggle visibility of the extra replies
+                    const isHidden = extraRepliesContainer.classList.toggle("hidden");
+                    showMoreButton.textContent = isHidden
+                        ? `[+] Show ${remainingReplies.length} more replies`
+                        : `[-] Show less`;
+                }
+            };
+        }
+
+        // --- Main Toggle Functionality ---
         toggleButton.onclick = () => {
             const isHidden = childrenContainer.classList.toggle("hidden");
             toggleButton.textContent = isHidden
-                ? `[+] Show Replies (${comment.children.length})`
-                : `[-] Hide Replies (${comment.children.length})`;
+                ? `[+] Show Replies (${comment.contentReplyCount})`
+                : `[-] Hide Replies (${comment.contentReplyCount})`;
         };
     }
     return commentDiv;

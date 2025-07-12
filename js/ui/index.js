@@ -1,7 +1,11 @@
 // js/ui/index.js
 
 import * as constants from "../constants.js";
-import {fetchComments} from "../api.js";
+import {
+    fetchComments,
+    fetchCommentsByAuthor,
+    fetchCommentsByIds,
+} from "../api.js";
 import * as wallet from "../wallet.js";
 import {renderComment} from "./commentRenderer.js";
 
@@ -13,12 +17,15 @@ let currentCursor = null;
 let hasNextPage = true;
 let isLoadingMore = false;
 let isInitialLoad = true;
-let likerLists = new Map();
 let ensCache = new Map();
 let pendingEnsLookups = new Map();
 let avatarCache = new Map();
 let pendingAvatarLookups = new Map();
 // Caches for profile view
+let profileComments = [];
+let profileCursor = null;
+let profileHasNextPage = true;
+let isProfileLoading = false;
 let followerStatsCache = new Map();
 let ensDetailsCache = new Map();
 let followStateCache = new Map();
@@ -47,7 +54,9 @@ function buildCommentTree(comments) {
     tree.sort(sortByDate);
     comments.forEach((comment) => {
         if (comment.children.length > 0) {
-            comment.children.sort(sortByDate);
+            comment.children.sort(
+                (a, b) => parseInt(a.createdAt) - parseInt(b.createdAt)
+            );
         }
     });
     return tree;
@@ -149,67 +158,33 @@ function showPostStatus(
     element.style.display = message ? "block" : "none";
 }
 
-function processCommentsAndLikes(comments) {
-    const newLikerLists = new Map();
-    const contentComments = [];
-    comments.forEach((comment) => {
-        if (
-            comment.commentType === constants.COMMENT_TYPE_REACTION &&
-            comment.content === constants.REACTION_CONTENT_LIKE &&
-            comment.parentId
-        ) {
-            if (!newLikerLists.has(comment.parentId)) {
-                newLikerLists.set(comment.parentId, new Set());
-            }
-            newLikerLists.get(comment.parentId).add(comment.author);
-        } else {
-            contentComments.push(comment);
-        }
-    });
-    return {contentComments, newLikerLists};
-}
-
 function displayFilteredComments(filterChannelId) {
     if (filterChannelId !== undefined) {
         currentChannelFilter = filterChannelId;
     }
 
-    let commentsToDisplay;
+    let commentTree;
 
     if (currentProfileFilter) {
-        dom.mentionsContainer.classList.add("hidden");
-        dom.commentsContainer.classList.remove("hidden");
-
-        const commentMap = new Map(allFetchedComments.map((c) => [c.id, c]));
-        const userComments = allFetchedComments.filter(
-            (c) => c.author.toLowerCase() === currentProfileFilter.toLowerCase()
-        );
-        const finalCommentIds = new Set();
-
-        userComments.forEach((userComment) => {
-            finalCommentIds.add(userComment.id);
-            let currentParentId = userComment.parentId;
-            while (currentParentId && commentMap.has(currentParentId)) {
-                finalCommentIds.add(currentParentId);
-                const parentComment = commentMap.get(currentParentId);
-                currentParentId = parentComment.parentId;
-            }
-        });
-
-        commentsToDisplay = allFetchedComments.filter((c) =>
-            finalCommentIds.has(c.id)
-        );
-    } else if (currentChannelFilter === null) {
-        commentsToDisplay = allFetchedComments;
+        // Profile view uses its own pre-built tree of comments
+        commentTree = profileComments;
     } else {
-        commentsToDisplay = allFetchedComments.filter(
-            (comment) =>
-                String(comment.channelId || 0) === String(currentChannelFilter)
-        );
+        // Main feed logic
+        let commentsToDisplay;
+        if (currentChannelFilter === null) {
+            commentsToDisplay = allFetchedComments;
+        } else {
+            commentsToDisplay = allFetchedComments.filter(
+                (comment) =>
+                    String(comment.channelId || 0) ===
+                    String(currentChannelFilter)
+            );
+        }
+        commentTree = buildCommentTree(commentsToDisplay);
     }
 
     dom.commentsContainer.innerHTML = "";
-    if (commentsToDisplay.length === 0) {
+    if (commentTree.length === 0) {
         let message = "No comments found for this filter.";
         if (currentProfileFilter) {
             message = "This user has not posted any comments.";
@@ -218,18 +193,11 @@ function displayFilteredComments(filterChannelId) {
         }
         showNoCommentsMessage(message);
     } else {
-        const commentTree = buildCommentTree(commentsToDisplay);
-        if (commentTree.length === 0 && commentsToDisplay.length > 0) {
-            showNoCommentsMessage(
-                "This user has not made any top-level posts (all comments are replies)."
+        commentTree.forEach((comment) => {
+            dom.commentsContainer.appendChild(
+                createCommentElement(comment, 0)
             );
-        } else {
-            commentTree.forEach((comment) => {
-                dom.commentsContainer.appendChild(
-                    createCommentElement(comment, 0)
-                );
-            });
-        }
+        });
     }
     renderChannelMenu();
 }
@@ -310,6 +278,11 @@ function updateNewCommentAreaVisibility() {
 
 function hideUserProfile() {
     currentProfileFilter = null;
+    // Reset profile state
+    profileComments = [];
+    profileCursor = null;
+    profileHasNextPage = true;
+    isProfileLoading = false;
     dom.profileViewHeader.classList.add("hidden");
     dom.profileViewTabs.classList.add("hidden");
     dom.mentionsContainer.classList.add("hidden");
@@ -320,6 +293,69 @@ function hideUserProfile() {
     dom.profileFollowState.classList.add("hidden");
     displayFilteredComments(currentChannelFilter);
     updateNewCommentAreaVisibility();
+}
+
+async function initializeProfileView(authorAddress) {
+    isProfileLoading = true;
+    showLoadingMessage(`Loading ${formatAddress(authorAddress)}'s comments...`);
+
+    profileComments = [];
+    profileCursor = null;
+    profileHasNextPage = true;
+
+    try {
+        // Wave 1: Fetch user's comments
+        const {items: userComments, pageInfo} = await fetchCommentsByAuthor(
+            authorAddress,
+            null
+        );
+
+        // Wave 2: Fetch parents for context
+        const parentIds = [
+            ...new Set(
+                userComments
+                    .map((c) => c.parentId)
+                    .filter(
+                        (id) => id && !userComments.some((c) => c.id === id)
+                    )
+            ),
+        ];
+
+        const {items: parentComments} = await fetchCommentsByIds(parentIds);
+
+        const allProfileViewComments = [...userComments, ...parentComments];
+
+        // 1. Filter out "like" comments to prevent them from being rendered.
+        const contentCommentsForProfile = allProfileViewComments.filter(
+            (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
+        );
+
+        // 2. Calculate accurate, content-only reply counts.
+        const nodeMap = new Map(
+            contentCommentsForProfile.map((c) => [c.id, c])
+        );
+        contentCommentsForProfile.forEach(
+            (node) => (node.contentReplyCount = 0)
+        );
+
+        contentCommentsForProfile.forEach((comment) => {
+            if (comment.parentId && nodeMap.has(comment.parentId)) {
+                nodeMap.get(comment.parentId).contentReplyCount++;
+            }
+        });
+
+        profileComments = buildCommentTree(contentCommentsForProfile);
+
+        profileCursor = pageInfo.endCursor;
+        profileHasNextPage = pageInfo.hasNextPage;
+
+        displayFilteredComments();
+    } catch (error) {
+        showErrorMessage("Failed to load profile comments.");
+        console.error(error);
+    } finally {
+        isProfileLoading = false;
+    }
 }
 
 function showUserProfile(authorAddress) {
@@ -338,6 +374,8 @@ function showUserProfile(authorAddress) {
     dom.profileCommentsTab.onclick = () => {
         dom.profileCommentsTab.classList.add("active");
         dom.profileMentionsTab.classList.remove("active");
+        dom.mentionsContainer.classList.add("hidden");
+        dom.commentsContainer.classList.remove("hidden");
         displayFilteredComments();
     };
     dom.profileMentionsTab.onclick = () => {
@@ -346,7 +384,7 @@ function showUserProfile(authorAddress) {
         displayProfileMentions();
     };
 
-    displayFilteredComments();
+    initializeProfileView(authorAddress);
     updateNewCommentAreaVisibility();
 
     fetchAndDisplayFollowerStats(authorAddress);
@@ -370,7 +408,6 @@ function createCommentElement(comment, depth) {
         state: {
             userAddress: wallet.getUserAddress(),
             isOnCorrectNetwork: wallet.getIsOnCorrectNetwork(),
-            likerLists,
         },
         formatters: {formatDate, formatAddress, resolveAndApplyAvatar},
         callbacks: {
@@ -418,23 +455,42 @@ async function loadMoreComments() {
             currentCursor
         );
         if (newRawComments && newRawComments.length > 0) {
-            const {contentComments: newContentComments, newLikerLists} =
-                processCommentsAndLikes(newRawComments);
+            const newProcessedComments = (newRawComments || []).map(
+                (topLevelComment) => {
+                    const allDescendants =
+                        topLevelComment.flatReplies.items || [];
+                    const contentReplies = allDescendants.filter(
+                        (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
+                    );
 
-            // Merge liker lists
-            newLikerLists.forEach((value, key) => {
-                if (likerLists.has(key)) {
-                    value.forEach((liker) => likerLists.get(key).add(liker));
-                } else {
-                    likerLists.set(key, value);
+                    const allContentNodes = [
+                        topLevelComment,
+                        ...contentReplies,
+                    ];
+                    const nodeMap = new Map(
+                        allContentNodes.map((c) => [c.id, c])
+                    );
+
+                    allContentNodes.forEach(
+                        (node) => (node.contentReplyCount = 0)
+                    );
+
+                    contentReplies.forEach((reply) => {
+                        if (reply.parentId && nodeMap.has(reply.parentId)) {
+                            nodeMap.get(reply.parentId).contentReplyCount++;
+                        }
+                    });
+
+                    topLevelComment.children = buildCommentTree(contentReplies);
+                    return topLevelComment;
                 }
-            });
+            );
 
-            allFetchedComments.push(...newContentComments);
+            allFetchedComments.push(...newProcessedComments);
             currentCursor = pageInfo.endCursor;
             hasNextPage = pageInfo.hasNextPage;
-            const newCommentTree = buildCommentTree(newContentComments);
-            newCommentTree.forEach((comment) => {
+
+            newProcessedComments.forEach((comment) => {
                 dom.commentsContainer.appendChild(
                     createCommentElement(comment, 0)
                 );
@@ -450,6 +506,48 @@ async function loadMoreComments() {
     }
 }
 
+async function loadMoreProfileComments() {
+    if (!profileHasNextPage || isProfileLoading) return;
+    isProfileLoading = true;
+    dom.refreshButton.classList.add("loading");
+
+    try {
+        const {items: userComments, pageInfo} = await fetchCommentsByAuthor(
+            currentProfileFilter,
+            profileCursor
+        );
+
+        if (userComments && userComments.length > 0) {
+            // Filter out "like" comments so they are not rendered as content.
+            const contentComments = userComments.filter(
+                (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
+            );
+
+            // Note: For subsequent pages, contentReplyCount uses the API's totalCount,
+            // which may include likes, as we don't have full thread context here.
+            contentComments.forEach((c) => {
+                c.contentReplyCount = c.replies?.totalCount || 0;
+            });
+
+            const newTree = buildCommentTree(contentComments);
+            newTree.forEach((comment) => {
+                dom.commentsContainer.appendChild(
+                    createCommentElement(comment, 0)
+                );
+            });
+            profileCursor = pageInfo.endCursor;
+            profileHasNextPage = pageInfo.hasNextPage;
+        } else {
+            profileHasNextPage = false;
+        }
+    } catch (error) {
+        console.error("Error loading more profile comments:", error);
+    } finally {
+        isProfileLoading = false;
+        dom.refreshButton.classList.remove("loading");
+    }
+}
+
 async function initializeCommentsView() {
     const wasInitialLoad = isInitialLoad;
     if (wasInitialLoad) showLoadingMessage();
@@ -459,15 +557,34 @@ async function initializeCommentsView() {
     hasNextPage = true;
     isLoadingMore = false;
     allFetchedComments = [];
-    likerLists.clear();
 
     try {
         const {items: rawFetchedComments, pageInfo} = await fetchComments();
-        const {contentComments, newLikerLists} = processCommentsAndLikes(
-            rawFetchedComments || []
+
+        const processedComments = (rawFetchedComments || []).map(
+            (topLevelComment) => {
+                const allDescendants = topLevelComment.flatReplies.items || [];
+                const contentReplies = allDescendants.filter(
+                    (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
+                );
+
+                const allContentNodes = [topLevelComment, ...contentReplies];
+                const nodeMap = new Map(allContentNodes.map((c) => [c.id, c]));
+
+                allContentNodes.forEach((node) => (node.contentReplyCount = 0));
+
+                contentReplies.forEach((reply) => {
+                    if (reply.parentId && nodeMap.has(reply.parentId)) {
+                        nodeMap.get(reply.parentId).contentReplyCount++;
+                    }
+                });
+
+                topLevelComment.children = buildCommentTree(contentReplies);
+                return topLevelComment;
+            }
         );
-        likerLists = newLikerLists;
-        allFetchedComments = contentComments;
+
+        allFetchedComments = processedComments;
         currentCursor = pageInfo.endCursor;
         hasNextPage = pageInfo.hasNextPage;
 
@@ -834,16 +951,22 @@ export function init() {
     );
     window.addEventListener("scroll", () => {
         if (
-            !isLoadingMore &&
-            hasNextPage &&
-            !currentProfileFilter &&
-            currentChannelFilter === null
+            window.innerHeight + window.scrollY >=
+            document.body.offsetHeight - 300
         ) {
             if (
-                window.innerHeight + window.scrollY >=
-                document.body.offsetHeight - 300
+                !isLoadingMore &&
+                hasNextPage &&
+                !currentProfileFilter &&
+                currentChannelFilter === null
             ) {
                 loadMoreComments();
+            } else if (
+                !isProfileLoading &&
+                profileHasNextPage &&
+                currentProfileFilter
+            ) {
+                loadMoreProfileComments();
             }
         }
     });
