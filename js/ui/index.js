@@ -21,10 +21,8 @@ let ensCache = new Map();
 let pendingEnsLookups = new Map();
 let avatarCache = new Map();
 let pendingAvatarLookups = new Map();
-// Caches for profile view
-let profileComments = [];
-let profileCursor = null;
-let profileHasNextPage = true;
+// Cache for profile views
+let profileViewCache = new Map(); // key: address, value: { comments: [], cursor: null, hasNextPage: true }
 let isProfileLoading = false;
 let followerStatsCache = new Map();
 let ensDetailsCache = new Map();
@@ -166,8 +164,9 @@ function displayFilteredComments(filterChannelId) {
     let commentTree;
 
     if (currentProfileFilter) {
-        // Profile view uses its own pre-built tree of comments
-        commentTree = profileComments;
+        // Profile view uses its own pre-built tree of comments from the cache
+        const profileData = profileViewCache.get(currentProfileFilter);
+        commentTree = profileData ? profileData.comments : [];
     } else {
         // Main feed logic
         let commentsToDisplay;
@@ -278,11 +277,6 @@ function updateNewCommentAreaVisibility() {
 
 function hideUserProfile() {
     currentProfileFilter = null;
-    // Reset profile state
-    profileComments = [];
-    profileCursor = null;
-    profileHasNextPage = true;
-    isProfileLoading = false;
     dom.profileViewHeader.classList.add("hidden");
     dom.profileViewTabs.classList.add("hidden");
     dom.mentionsContainer.classList.add("hidden");
@@ -296,21 +290,24 @@ function hideUserProfile() {
 }
 
 async function initializeProfileView(authorAddress) {
-    isProfileLoading = true;
-    showLoadingMessage(`Loading ${formatAddress(authorAddress)}'s comments...`);
+    // Step 1: Optimistic Render. If cache exists, display it immediately.
+    if (profileViewCache.has(authorAddress)) {
+        displayFilteredComments();
+    } else {
+        // On first visit, show a loading message.
+        showLoadingMessage(`Loading ${formatAddress(authorAddress)}'s comments...`);
+    }
 
-    profileComments = [];
-    profileCursor = null;
-    profileHasNextPage = true;
+    isProfileLoading = true;
 
     try {
-        // Wave 1: Fetch user's comments
+        // Step 2: Always fetch the latest first page of comments.
         const {items: userComments, pageInfo} = await fetchCommentsByAuthor(
             authorAddress,
             null
         );
 
-        // Wave 2: Fetch parents for context
+        // Step 3: Process the newly fetched comments completely.
         const parentIds = [
             ...new Set(
                 userComments
@@ -320,38 +317,46 @@ async function initializeProfileView(authorAddress) {
                     )
             ),
         ];
-
         const {items: parentComments} = await fetchCommentsByIds(parentIds);
 
         const allProfileViewComments = [...userComments, ...parentComments];
-
-        // 1. Filter out "like" comments to prevent them from being rendered.
         const contentCommentsForProfile = allProfileViewComments.filter(
             (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
         );
 
-        // 2. Calculate accurate, content-only reply counts.
         const nodeMap = new Map(
             contentCommentsForProfile.map((c) => [c.id, c])
         );
         contentCommentsForProfile.forEach(
             (node) => (node.contentReplyCount = 0)
         );
-
         contentCommentsForProfile.forEach((comment) => {
             if (comment.parentId && nodeMap.has(comment.parentId)) {
                 nodeMap.get(comment.parentId).contentReplyCount++;
             }
         });
 
-        profileComments = buildCommentTree(contentCommentsForProfile);
+        const builtTree = buildCommentTree(contentCommentsForProfile);
 
-        profileCursor = pageInfo.endCursor;
-        profileHasNextPage = pageInfo.hasNextPage;
+        // Step 4: Update the cache with the fresh data.
+        const existingData = profileViewCache.get(authorAddress);
+        profileViewCache.set(authorAddress, {
+            comments: builtTree,
+            // IMPORTANT: Preserve the old cursor and hasNextPage for infinite scroll.
+            // Only set them if this is the very first load for this profile.
+            cursor: existingData ? existingData.cursor : pageInfo.endCursor,
+            hasNextPage: existingData
+                ? existingData.hasNextPage
+                : pageInfo.hasNextPage,
+        });
 
+        // Step 5: Re-render the UI with the fresh data.
         displayFilteredComments();
     } catch (error) {
-        showErrorMessage("Failed to load profile comments.");
+        // Only show a prominent error on the initial load.
+        if (!profileViewCache.has(authorAddress)) {
+            showErrorMessage("Failed to load profile comments.");
+        }
         console.error(error);
     } finally {
         isProfileLoading = false;
@@ -507,38 +512,42 @@ async function loadMoreComments() {
 }
 
 async function loadMoreProfileComments() {
-    if (!profileHasNextPage || isProfileLoading) return;
+    const profileData = profileViewCache.get(currentProfileFilter);
+    if (!profileData || !profileData.hasNextPage || isProfileLoading) return;
+
     isProfileLoading = true;
     dom.refreshButton.classList.add("loading");
 
     try {
         const {items: userComments, pageInfo} = await fetchCommentsByAuthor(
             currentProfileFilter,
-            profileCursor
+            profileData.cursor
         );
 
         if (userComments && userComments.length > 0) {
-            // Filter out "like" comments so they are not rendered as content.
             const contentComments = userComments.filter(
                 (c) => c.commentType !== constants.COMMENT_TYPE_REACTION
             );
 
-            // Note: For subsequent pages, contentReplyCount uses the API's totalCount,
-            // which may include likes, as we don't have full thread context here.
             contentComments.forEach((c) => {
                 c.contentReplyCount = c.replies?.totalCount || 0;
             });
 
             const newTree = buildCommentTree(contentComments);
+
+            // Append new comments to the DOM
             newTree.forEach((comment) => {
                 dom.commentsContainer.appendChild(
                     createCommentElement(comment, 0)
                 );
             });
-            profileCursor = pageInfo.endCursor;
-            profileHasNextPage = pageInfo.hasNextPage;
+
+            // Update the cache with new data
+            profileData.comments.push(...newTree);
+            profileData.cursor = pageInfo.endCursor;
+            profileData.hasNextPage = pageInfo.hasNextPage;
         } else {
-            profileHasNextPage = false;
+            profileData.hasNextPage = false;
         }
     } catch (error) {
         console.error("Error loading more profile comments:", error);
@@ -961,12 +970,11 @@ export function init() {
                 currentChannelFilter === null
             ) {
                 loadMoreComments();
-            } else if (
-                !isProfileLoading &&
-                profileHasNextPage &&
-                currentProfileFilter
-            ) {
-                loadMoreProfileComments();
+            } else if (currentProfileFilter && !isProfileLoading) {
+                const profileData = profileViewCache.get(currentProfileFilter);
+                if (profileData && profileData.hasNextPage) {
+                    loadMoreProfileComments();
+                }
             }
         }
     });
