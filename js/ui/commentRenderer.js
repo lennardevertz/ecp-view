@@ -349,7 +349,7 @@ function renderContentWithEmbeds(content, formatters, callbacks) {
 }
 
 export function renderComment(comment, config) {
-    const {depth, state, formatters, callbacks} = config;
+    const {depth, state, formatters, callbacks, channelInfoMap} = config;
     const {userAddress, isOnCorrectNetwork} = state;
     const {formatDate, formatAddress, resolveAndApplyAvatar} = formatters;
     const {onProfileClick, onReply, onLike} = callbacks;
@@ -443,10 +443,15 @@ export function renderComment(comment, config) {
     }
 
     // Channel, Tx Link
-    if (comment.channelId && String(comment.channelId) !== "0") {
+    if (comment.channelId !== undefined && comment.channelId !== null) {
         const channelDisplayDiv = document.createElement("div");
         channelDisplayDiv.classList.add("comment-channel-display");
-        channelDisplayDiv.textContent = `Channel: ${comment.channelId}`;
+        const info = channelInfoMap?.get(String(comment.channelId));
+        if (info) {
+            channelDisplayDiv.textContent = `${info.name}`;
+        } else {
+            channelDisplayDiv.textContent = `Channel: ${comment.channelId}`;
+        }
         commentDiv.appendChild(channelDisplayDiv);
     }
     if (comment.txHash) {
@@ -560,7 +565,9 @@ export function renderComment(comment, config) {
         // 1. Render and display the first reply immediately.
         const firstReply = comment.children[0];
         const firstReplyConfig = {...config, depth: depth + 1};
-        childrenContainer.appendChild(renderComment(firstReply, firstReplyConfig));
+        childrenContainer.appendChild(
+            renderComment(firstReply, firstReplyConfig)
+        );
 
         const remainingReplies = comment.children.slice(1);
 
@@ -580,19 +587,27 @@ export function renderComment(comment, config) {
                 if (!areExtraRepliesRendered) {
                     // First click: create container and render replies
                     extraRepliesContainer = document.createElement("div");
-                    extraRepliesContainer.classList.add("extra-replies-container");
-                    
+                    extraRepliesContainer.classList.add(
+                        "extra-replies-container"
+                    );
+
                     remainingReplies.forEach((reply) => {
                         const replyConfig = {...config, depth: depth + 1};
-                        extraRepliesContainer.appendChild(renderComment(reply, replyConfig));
+                        extraRepliesContainer.appendChild(
+                            renderComment(reply, replyConfig)
+                        );
                     });
-                    
-                    childrenContainer.insertBefore(extraRepliesContainer, showMoreButton);
+
+                    childrenContainer.insertBefore(
+                        extraRepliesContainer,
+                        showMoreButton
+                    );
                     areExtraRepliesRendered = true;
                     showMoreButton.textContent = `[-] Show less`;
                 } else {
                     // Subsequent clicks: toggle visibility of the extra replies
-                    const isHidden = extraRepliesContainer.classList.toggle("hidden");
+                    const isHidden =
+                        extraRepliesContainer.classList.toggle("hidden");
                     showMoreButton.textContent = isHidden
                         ? `[+] Show ${remainingReplies.length} more replies`
                         : `[-] Show less`;

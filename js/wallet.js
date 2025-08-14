@@ -8,7 +8,7 @@ import {
     BASE_CHAIN_NAME,
     COMMENT_MANAGER_ADDRESS,
     ICommentManagerABI,
-} from './constants.js';
+} from "./constants.js";
 
 // --- Module State ---
 let eip6963Providers = [];
@@ -30,9 +30,15 @@ export const getIsOnCorrectNetwork = () => isOnCorrectNetwork;
 export const getEip6963Providers = () => eip6963Providers;
 
 // --- Callback Registration ---
-export function registerOnConnect(callback) { onConnectCallback = callback; }
-export function registerOnLogout(callback) { onLogoutCallback = callback; }
-export function registerOnCommentPosted(callback) { onCommentPostedCallback = callback; }
+export function registerOnConnect(callback) {
+    onConnectCallback = callback;
+}
+export function registerOnLogout(callback) {
+    onLogoutCallback = callback;
+}
+export function registerOnCommentPosted(callback) {
+    onCommentPostedCallback = callback;
+}
 
 // --- Wallet Functions ---
 
@@ -48,7 +54,11 @@ function storeProvider(providerDetail) {
 export function discoverEIP6963Providers(connectWalletButton) {
     window.addEventListener("eip6963:announceProvider", (event) => {
         storeProvider(event.detail);
-        if (connectWalletButton && connectWalletButton.disabled && !userAddress) {
+        if (
+            connectWalletButton &&
+            connectWalletButton.disabled &&
+            !userAddress
+        ) {
             connectWalletButton.disabled = false;
             connectWalletButton.textContent = "Connect Wallet";
         }
@@ -69,7 +79,7 @@ async function switchToBase(rawProvider) {
     try {
         await rawProvider.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: TARGET_CHAIN_ID_HEX }],
+            params: [{chainId: TARGET_CHAIN_ID_HEX}],
         });
         return true;
     } catch (switchError) {
@@ -77,13 +87,19 @@ async function switchToBase(rawProvider) {
             try {
                 await rawProvider.request({
                     method: "wallet_addEthereumChain",
-                    params: [{
-                        chainId: TARGET_CHAIN_ID_HEX,
-                        chainName: BASE_CHAIN_NAME,
-                        nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
-                        rpcUrls: [BASE_RPC_URL],
-                        blockExplorerUrls: [BASE_EXPLORER_URL],
-                    }],
+                    params: [
+                        {
+                            chainId: TARGET_CHAIN_ID_HEX,
+                            chainName: BASE_CHAIN_NAME,
+                            nativeCurrency: {
+                                name: "Ethereum",
+                                symbol: "ETH",
+                                decimals: 18,
+                            },
+                            rpcUrls: [BASE_RPC_URL],
+                            blockExplorerUrls: [BASE_EXPLORER_URL],
+                        },
+                    ],
                 });
                 return true;
             } catch (addError) {
@@ -105,10 +121,16 @@ export async function connectWallet(showPostStatus, connectWalletButton) {
     const rawProvider = selectedProviderDetail.provider;
 
     try {
-        const accounts = await rawProvider.request({ method: "eth_requestAccounts" });
-        if (!accounts || accounts.length === 0) throw new Error("No accounts returned.");
+        const accounts = await rawProvider.request({
+            method: "eth_requestAccounts",
+        });
+        if (!accounts || accounts.length === 0)
+            throw new Error("No accounts returned.");
 
-        ethersProvider = new window.ethers.providers.Web3Provider(rawProvider, "any");
+        ethersProvider = new window.ethers.providers.Web3Provider(
+            rawProvider,
+            "any"
+        );
         const network = await ethersProvider.getNetwork();
 
         if (network.chainId !== TARGET_CHAIN_ID) {
@@ -117,18 +139,28 @@ export async function connectWallet(showPostStatus, connectWalletButton) {
                 logout();
                 showPostStatus(`Please switch to ${BASE_CHAIN_NAME}.`, true);
                 if (connectWalletButton) {
-                    connectWalletButton.textContent = `Switch to ${BASE_CHAIN_NAME.replace(" Mainnet", "")}`;
+                    connectWalletButton.textContent = `Switch to ${BASE_CHAIN_NAME.replace(
+                        " Mainnet",
+                        ""
+                    )}`;
                     connectWalletButton.disabled = false;
                 }
                 return;
             }
-            ethersProvider = new window.ethers.providers.Web3Provider(rawProvider, "any");
+            ethersProvider = new window.ethers.providers.Web3Provider(
+                rawProvider,
+                "any"
+            );
         }
 
         isOnCorrectNetwork = true;
         signer = ethersProvider.getSigner();
         userAddress = await signer.getAddress();
-        commentManagerContract = new window.ethers.Contract(COMMENT_MANAGER_ADDRESS, ICommentManagerABI, signer);
+        commentManagerContract = new window.ethers.Contract(
+            COMMENT_MANAGER_ADDRESS,
+            ICommentManagerABI,
+            signer
+        );
 
         showPostStatus("", false);
         onConnectCallback(); // Trigger UI update
@@ -148,18 +180,38 @@ export function logout() {
     onLogoutCallback(); // Trigger UI update
 }
 
-export async function submitEcpComment(content, channelIdStr, parentId, statusElement, showPostStatus, commentTypeParam = 0) {
+export async function submitEcpComment(
+    content,
+    channelIdStr,
+    parentId,
+    statusElement,
+    showPostStatus,
+    commentTypeParam = 0
+) {
     if (!signer || !commentManagerContract) {
-        showPostStatus("Please connect your wallet first.", true, statusElement);
+        showPostStatus(
+            "Please connect your wallet first.",
+            true,
+            statusElement
+        );
         return Promise.reject("Wallet not connected");
     }
     if (!isOnCorrectNetwork) {
-        showPostStatus(`Please connect to ${BASE_CHAIN_NAME}.`, true, statusElement);
+        showPostStatus(
+            `Please connect to ${BASE_CHAIN_NAME}.`,
+            true,
+            statusElement
+        );
         return Promise.reject("Wrong network");
     }
+    console.log("Submitting comment");
 
-    const { ethers } = window;
-    const channelId = channelIdStr && String(channelIdStr).trim() !== "" ? parseInt(channelIdStr) : 0;
+    const {ethers} = window;
+    const channelId =
+        channelIdStr && String(channelIdStr).trim() !== ""
+            ? String(channelIdStr).trim()
+            : "0";
+    console.log(channelId);
     if (isNaN(channelId)) {
         showPostStatus("Invalid Channel ID.", true, statusElement);
         return Promise.reject("Invalid Channel ID");
@@ -179,16 +231,28 @@ export async function submitEcpComment(content, channelIdStr, parentId, statusEl
     };
 
     try {
-        showPostStatus("Confirm transaction in wallet...", false, statusElement);
+        showPostStatus(
+            "Confirm transaction in wallet...",
+            false,
+            statusElement
+        );
         const tx = await commentManagerContract.postComment(commentData, "0x");
-        showPostStatus(`Transaction sent: ${tx.hash.substring(0, 10)}...`, false, statusElement);
+        showPostStatus(
+            `Transaction sent: ${tx.hash.substring(0, 10)}...`,
+            false,
+            statusElement
+        );
         await tx.wait();
         showPostStatus("Action completed! Refreshing...", false, statusElement);
         onCommentPostedCallback(); // Trigger UI update
         return Promise.resolve();
     } catch (error) {
         console.error("Error performing action:", error);
-        const errMsg = error.data?.message || error.reason || error.message || "Failed to perform action.";
+        const errMsg =
+            error.data?.message ||
+            error.reason ||
+            error.message ||
+            "Failed to perform action.";
         showPostStatus(`Error: ${errMsg}`, true, statusElement);
         return Promise.reject(error);
     }

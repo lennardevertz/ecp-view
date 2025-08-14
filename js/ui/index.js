@@ -5,6 +5,7 @@ import {
     fetchComments,
     fetchCommentsByAuthor,
     fetchCommentsByIds,
+    fetchChannels,
 } from "../api.js";
 import * as wallet from "../wallet.js";
 import {renderComment} from "./commentRenderer.js";
@@ -29,8 +30,29 @@ let ensDetailsCache = new Map();
 let followStateCache = new Map();
 let commonFollowersCache = new Map();
 
+// key: id (string) → { name, description }
+const channelInfoMap = new Map();
+
 // --- DOM Elements (will be assigned in init) ---
 let dom = {};
+
+async function loadChannels() {
+    try {
+        const items = await fetchChannels();
+        items.forEach((c) =>
+            channelInfoMap.set(String(c.id), {
+                name: c.name,
+                description: c.description || "",
+            })
+        );
+        renderChannelMenu(); // refresh menu labels
+        if (allFetchedComments.length)
+            // refresh comments if already rendered
+            displayFilteredComments(currentChannelFilter);
+    } catch (e) {
+        console.error("Failed to load channels:", e);
+    }
+}
 
 // --- Utility Functions ---
 const sortByDate = (a, b) => parseInt(b.createdAt) - parseInt(a.createdAt);
@@ -193,9 +215,7 @@ function displayFilteredComments(filterChannelId) {
         showNoCommentsMessage(message);
     } else {
         commentTree.forEach((comment) => {
-            dom.commentsContainer.appendChild(
-                createCommentElement(comment, 0)
-            );
+            dom.commentsContainer.appendChild(createCommentElement(comment, 0));
         });
     }
     renderChannelMenu();
@@ -233,7 +253,17 @@ function renderChannelMenu() {
             !channelIds.size &&
             !hasNoChannelComments)
     ) {
-        const noChannelButton = createButton("No Channel", 0);
+        const homeInfo = channelInfoMap.get("0");
+        const noChannelLabel = homeInfo
+            ? `${homeInfo.name}${
+                  homeInfo.description
+                      ? " - " +
+                        homeInfo.description.slice(0, 40) +
+                        (homeInfo.description.length > 40 ? "…" : "")
+                      : ""
+              }`
+            : "No Channel";
+        const noChannelButton = createButton(noChannelLabel, 0);
         if (currentChannelFilter === 0 && currentChannelFilter !== null) {
             noChannelButton.classList.add("active-channel");
         }
@@ -250,7 +280,14 @@ function renderChannelMenu() {
     });
 
     sortedChannelIds.forEach((id) => {
-        const channelButton = createButton(`Channel: ${id}`, id);
+        const info = channelInfoMap.get(String(id));
+        const desc = info?.description
+            ? ` - ${info.description.slice(0, 40)}${
+                  info.description.length > 40 ? "…" : ""
+              }`
+            : "";
+        const label = info ? `${info.name}${desc}` : `Channel: ${id}`;
+        const channelButton = createButton(label, id);
         if (
             currentChannelFilter !== null &&
             currentChannelFilter !== 0 &&
@@ -295,7 +332,9 @@ async function initializeProfileView(authorAddress) {
         displayFilteredComments();
     } else {
         // On first visit, show a loading message.
-        showLoadingMessage(`Loading ${formatAddress(authorAddress)}'s comments...`);
+        showLoadingMessage(
+            `Loading ${formatAddress(authorAddress)}'s comments...`
+        );
     }
 
     isProfileLoading = true;
@@ -447,6 +486,7 @@ function createCommentElement(comment, depth) {
                 }
             },
         },
+        channelInfoMap,
     };
     return renderComment(comment, config);
 }
@@ -934,9 +974,13 @@ export function init() {
     dom.submitNewCommentButton.addEventListener("click", async () => {
         dom.submitNewCommentButton.disabled = true;
         try {
+            const channelId =
+                dom.newCommentChannelId.value.trim() ||
+                constants.DEFAULT_CHANNEL_ID;
+            console.log("Channel id", channelId);
             await wallet.submitEcpComment(
                 dom.newCommentContent.value,
-                dom.newCommentChannelId.value,
+                channelId,
                 null,
                 dom.postStatusMessage,
                 showPostStatus
@@ -986,5 +1030,6 @@ export function init() {
 
     // Initial calls
     wallet.discoverEIP6963Providers(dom.connectWalletButton);
+    loadChannels();
     initializeCommentsView();
 }

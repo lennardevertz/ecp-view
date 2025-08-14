@@ -72,6 +72,8 @@ export const ETH_MAINNET_RPC_URL = "https://ethereum-rpc.publicnode.com";
 // ECP Comment Types
 export const COMMENT_TYPE_REACTION = 1;
 export const REACTION_CONTENT_LIKE = "like";
+export const DEFAULT_CHANNEL_ID =
+    "100036372667656530751584069124758750674110482798070943145930443465728545275054";
 
 // API and UI Configuration
 export const ECP_API_URL = "https://api.ethcomments.xyz/";
@@ -184,5 +186,18 @@ export const COMMENTS_BY_IDS_QUERY = `query CommentsByIds($ids: [String!]) {
         totalCount
       }
     }
+  }
+}`;
+
+export const CHANNEL_QUERY = `query GetChannels {
+  channels {
+    items {
+      name
+      description
+      metadata
+      id
+      owner
+    }
+    totalCount
   }
 }`;

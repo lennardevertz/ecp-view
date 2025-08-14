@@ -6,6 +6,7 @@ import {
     COMMENT_FETCH_LIMIT,
     COMMENTS_BY_AUTHOR_QUERY,
     COMMENTS_BY_IDS_QUERY,
+    CHANNEL_QUERY,
 } from "./constants.js";
 
 export async function fetchComments(cursor = null) {
@@ -18,7 +19,7 @@ export async function fetchComments(cursor = null) {
             },
             body: JSON.stringify({
                 query: COMMENTS_QUERY,
-                variables: { limit: COMMENT_FETCH_LIMIT, after: cursor },
+                variables: {limit: COMMENT_FETCH_LIMIT, after: cursor},
             }),
         });
         if (!response.ok) {
@@ -36,7 +37,7 @@ export async function fetchComments(cursor = null) {
         return (
             result.data.comments || {
                 items: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
+                pageInfo: {hasNextPage: false, endCursor: null},
             }
         );
     } catch (error) {
@@ -86,4 +87,20 @@ export async function fetchCommentsByIds(ids) {
         console.error("Error fetching comments by IDs:", error);
         throw error;
     }
+}
+
+export async function fetchChannels() {
+    const response = await fetch(ECP_API_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({query: CHANNEL_QUERY}),
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const result = await response.json();
+    if (result.errors)
+        throw new Error(result.errors.map((e) => e.message).join(", "));
+    return result.data.channels.items;
 }
